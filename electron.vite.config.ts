@@ -13,6 +13,7 @@ export default defineConfig({
   },
 
   renderer: {
+    publicDir: resolve('docs'),
     plugins: [react(), tailwindcss()],
 
     resolve: {

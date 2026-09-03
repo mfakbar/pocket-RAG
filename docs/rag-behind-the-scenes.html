@@ -1,661 +1,1709 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="How RavnDock uses local retrieval-augmented generation." />
-    <title>RAG behind the scenes · RavnDock</title>
-    <style>
-      :root {
-        color-scheme: dark;
-        --bg: #07111f;
-        --surface: #0d1929;
-        --surface-2: #13233a;
-        --border: #263952;
-        --text: #eff6ff;
-        --muted: #9fb0c5;
-        --primary: #70a8ff;
-        --primary-soft: rgba(112, 168, 255, 0.12);
-        --success: #76d6a5;
-      }
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>RAG Behind the Scenes</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --surface: #ffffff;
+      --surface-2: #f8fafc;
+      --surface-3: #eef3f9;
+      --text: #172033;
+      --muted: #637083;
+      --border: #d9e1eb;
+      --border-strong: #c4cfdd;
+      --blue: #246fce;
+      --blue-strong: #155bb2;
+      --blue-soft: #e8f2ff;
+      --green: #238758;
+      --green-soft: #e6f6ee;
+      --purple: #7857d8;
+      --purple-soft: #f0ebff;
+      --amber: #ad6d0d;
+      --amber-soft: #fff4dc;
+      --danger: #bd3f50;
+      --shadow: 0 12px 34px rgba(27, 48, 78, 0.08);
+      --radius: 18px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
 
-      * {
-        box-sizing: border-box;
-      }
-      html {
-        scroll-behavior: smooth;
-      }
-      body {
-        margin: 0;
-        background:
-          radial-gradient(circle at 12% 0%, rgba(69, 125, 208, 0.18), transparent 31rem),
-          radial-gradient(circle at 92% 18%, rgba(63, 197, 163, 0.1), transparent 28rem), var(--bg);
-        color: var(--text);
-        font-family:
-          Inter,
-          ui-sans-serif,
-          -apple-system,
-          BlinkMacSystemFont,
-          'Segoe UI',
-          sans-serif;
-        line-height: 1.6;
-      }
+    html[data-theme="dark"] {
+      --bg: #0c0f13;
+      --surface: #15191e;
+      --surface-2: #101419;
+      --surface-3: #1b2129;
+      --text: #f0f3f7;
+      --muted: #9aa5b4;
+      --border: #2c333d;
+      --border-strong: #3b4552;
+      --blue: #5aa6ff;
+      --blue-strong: #8bc0ff;
+      --blue-soft: #152a43;
+      --green: #68cc8d;
+      --green-soft: #142b20;
+      --purple: #a791ff;
+      --purple-soft: #241d40;
+      --amber: #efba61;
+      --amber-soft: #352814;
+      --danger: #ff8493;
+      --shadow: 0 18px 46px rgba(0, 0, 0, 0.26);
+    }
 
-      a {
-        color: inherit;
+    @media (prefers-color-scheme: dark) {
+      html:not([data-theme]) {
+        --bg: #0c0f13;
+        --surface: #15191e;
+        --surface-2: #101419;
+        --surface-3: #1b2129;
+        --text: #f0f3f7;
+        --muted: #9aa5b4;
+        --border: #2c333d;
+        --border-strong: #3b4552;
+        --blue: #5aa6ff;
+        --blue-strong: #8bc0ff;
+        --blue-soft: #152a43;
+        --green: #68cc8d;
+        --green-soft: #142b20;
+        --purple: #a791ff;
+        --purple-soft: #241d40;
+        --amber: #efba61;
+        --amber-soft: #352814;
+        --danger: #ff8493;
+        --shadow: 0 18px 46px rgba(0, 0, 0, 0.26);
       }
-      button {
-        font: inherit;
-      }
-      h1,
-      h2,
-      h3,
-      p {
-        margin-top: 0;
-      }
-      h1 {
-        max-width: 780px;
-        margin-bottom: 18px;
-        font-size: clamp(2.25rem, 6vw, 4.5rem);
-        line-height: 1.04;
-        letter-spacing: -0.045em;
-      }
-      h2 {
-        font-size: clamp(1.55rem, 3vw, 2.25rem);
-        line-height: 1.2;
-        letter-spacing: -0.025em;
-      }
+    }
 
-      .shell {
-        width: min(1120px, calc(100% - 32px));
-        margin: auto;
-        padding: 56px 0 72px;
-      }
-      .eyebrow {
-        margin-bottom: 12px;
-        color: var(--primary);
-        font-size: 0.74rem;
-        font-weight: 750;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-      }
-      .intro {
-        max-width: 760px;
-        color: var(--muted);
-        font-size: 1.08rem;
-      }
-      .local-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        margin-top: 18px;
-        padding: 8px 12px;
-        border: 1px solid rgba(118, 214, 165, 0.28);
-        border-radius: 999px;
-        background: rgba(118, 214, 165, 0.08);
-        color: var(--success);
-        font-size: 0.78rem;
-        font-weight: 700;
-      }
-      .local-pill::before {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: currentColor;
-        box-shadow: 0 0 0 5px rgba(118, 214, 165, 0.1);
-        content: '';
-      }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background:
+        radial-gradient(circle at 10% -10%, color-mix(in srgb, var(--blue) 12%, transparent), transparent 31rem),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.5;
+    }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, input:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--blue) 38%, transparent);
+      outline-offset: 2px;
+    }
 
-      .card {
-        border: 1px solid var(--border);
-        background: rgba(13, 25, 41, 0.9);
-        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
-      }
-      .summary-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 14px;
-        margin: 42px 0 64px;
-      }
-      .summary-card {
-        padding: 20px;
-        border-radius: 18px;
-      }
-      .summary-card strong {
-        display: block;
-        margin-bottom: 6px;
-        font-size: 0.95rem;
-      }
-      .summary-card p,
-      .section-copy,
-      .detail-copy,
-      .privacy-note p {
-        margin-bottom: 0;
-        color: var(--muted);
-      }
-      .section-heading {
-        display: flex;
-        align-items: end;
-        justify-content: space-between;
-        gap: 24px;
-        margin-bottom: 20px;
-      }
-      .section-copy {
-        max-width: 560px;
-        font-size: 0.92rem;
-      }
-      .journeys {
-        display: grid;
-        gap: 16px;
-      }
-      .journey {
-        padding: 20px;
-        border-radius: 20px;
-      }
-      .journey-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 20px;
-        margin-bottom: 14px;
-      }
-      .journey-label {
-        color: var(--primary);
-        font-size: 0.76rem;
-        font-weight: 750;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-      }
-      .journey-note {
-        color: var(--muted);
-        font-size: 0.78rem;
-      }
-      .stage-row {
-        display: grid;
-        grid-template-columns: repeat(var(--count), minmax(112px, 1fr));
-        gap: 10px;
-      }
-      .stage {
-        min-height: 116px;
-        padding: 14px 11px;
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        background: #091523;
-        color: var(--muted);
-        cursor: pointer;
-        text-align: left;
-        transition:
-          border-color 160ms,
-          background 160ms,
-          transform 160ms;
-      }
-      .stage:hover,
-      .stage:focus-visible {
-        border-color: rgba(112, 168, 255, 0.65);
-        outline: none;
-        transform: translateY(-2px);
-      }
-      .stage[aria-pressed='true'] {
-        border-color: rgba(112, 168, 255, 0.72);
-        background: var(--primary-soft);
-        color: var(--text);
-      }
-      .stage-number {
-        display: inline-grid;
-        width: 28px;
-        height: 28px;
-        margin-bottom: 13px;
-        place-items: center;
-        border: 1px solid var(--border);
-        border-radius: 9px;
-        color: var(--primary);
-        font-size: 0.72rem;
-        font-weight: 800;
-      }
-      .stage-title {
-        display: block;
-        color: inherit;
-        font-size: 0.8rem;
-        font-weight: 750;
-        line-height: 1.25;
-      }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      border-bottom: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+      background: color-mix(in srgb, var(--bg) 86%, transparent);
+      backdrop-filter: blur(18px);
+    }
+    .topbar-inner {
+      width: min(1280px, calc(100% - 32px));
+      min-height: 66px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      font-weight: 760;
+      letter-spacing: -0.01em;
+    }
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1px solid color-mix(in srgb, var(--blue) 35%, var(--border));
+      border-radius: 11px;
+      color: var(--blue);
+      background: var(--blue-soft);
+    }
+    .brand-mark svg { width: 19px; height: 19px; }
+    .topnav {
+      display: flex;
+      gap: 4px;
+      margin-left: auto;
+    }
+    .topnav a {
+      padding: 8px 10px;
+      border-radius: 9px;
+      color: var(--muted);
+      font-size: 13px;
+      text-decoration: none;
+    }
+    .topnav a:hover { color: var(--text); background: var(--surface-3); }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-left: 14px;
+      border-left: 1px solid var(--border);
+    }
+    .tool-button, .primary-button, .secondary-button {
+      min-height: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform .18s ease, border-color .18s ease, background .18s ease;
+    }
+    .tool-button:hover, .primary-button:hover, .secondary-button:hover { transform: translateY(-1px); }
+    .tool-button {
+      width: 40px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      background: var(--surface);
+    }
+    .tool-button svg { width: 17px; height: 17px; }
+    .app-back-button { display: none; }
+    html[data-embedded="true"] .app-back-button { display: inline-flex; }
+    .primary-button {
+      border: 1px solid var(--blue);
+      padding: 0 14px;
+      background: var(--blue);
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .tour-mobile { display: none; }
+    .secondary-button {
+      border: 1px solid var(--border);
+      padding: 0 14px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 650;
+    }
 
-      .detail-panel {
-        display: grid;
-        grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1.5fr);
-        gap: 26px;
-        margin-top: 16px;
-        padding: 26px;
-        border-radius: 20px;
-      }
-      .detail-step {
-        margin-bottom: 8px;
-        color: var(--primary);
-        font-size: 0.72rem;
-        font-weight: 750;
-        letter-spacing: 0.09em;
-        text-transform: uppercase;
-      }
-      .detail-panel h3 {
-        margin-bottom: 12px;
-        font-size: 1.4rem;
-      }
-      .io-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-        margin-top: 18px;
-      }
-      .io-card {
-        padding: 14px;
-        border: 1px solid var(--border);
-        border-radius: 13px;
-        background: #091523;
-      }
-      .io-card span {
-        display: block;
-        margin-bottom: 5px;
-        color: var(--primary);
-        font-size: 0.66rem;
-        font-weight: 800;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-      }
-      .io-card p {
-        margin: 0;
-        color: var(--muted);
-        font-size: 0.82rem;
-      }
+    .page {
+      width: min(1280px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 34px 0 64px;
+    }
+    .hero, .journey, .connections, .inspector {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: color-mix(in srgb, var(--surface) 96%, transparent);
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      align-items: center;
+      gap: 42px;
+      padding: 28px;
+    }
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    .eyebrow svg { width: 20px; height: 20px; }
+    h1 {
+      max-width: 760px;
+      margin: 11px 0 9px;
+      font-size: clamp(28px, 4vw, 46px);
+      line-height: 1.08;
+      letter-spacing: -.035em;
+    }
+    .hero-copy {
+      max-width: 770px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+    .local-note {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 18px;
+      padding: 7px 10px;
+      border: 1px solid color-mix(in srgb, var(--green) 32%, var(--border));
+      border-radius: 999px;
+      background: var(--green-soft);
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .model-stack {
+      display: grid;
+      gap: 10px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      background: var(--surface-2);
+    }
+    .model-row {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .model-row:last-child { padding: 0; border: 0; }
+    .model-label { color: var(--muted); }
+    .model-value {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      font-family: var(--mono);
+      font-weight: 700;
+    }
+    .on-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--green);
+    }
+    .on-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 5px color-mix(in srgb, var(--green) 12%, transparent);
+    }
 
-      .stage-visual {
-        min-height: 240px;
-        padding: 22px;
-        border: 1px solid rgba(112, 168, 255, 0.28);
-        border-radius: 16px;
-        background: var(--primary-soft);
-      }
-      .visual-label {
-        margin-bottom: 14px;
-        color: var(--primary);
-        font-size: 0.7rem;
-        font-weight: 800;
-        letter-spacing: 0.11em;
-      }
-      .visual-flow {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
-        margin-bottom: 16px;
-      }
-      .visual-item {
-        padding: 11px;
-        border: 1px solid var(--border);
-        border-radius: 11px;
-        background: var(--surface);
-        font-size: 0.72rem;
-      }
-      .visual-item strong {
-        display: block;
-        color: var(--primary);
-      }
-      .answer {
-        margin: 0;
-        font-size: 1.05rem;
-        line-height: 1.75;
-      }
-      .token {
-        display: inline-block;
-        margin: 2px;
-        padding: 0 5px;
-        border-radius: 5px;
-        background: var(--surface);
-      }
-      .cursor {
-        display: inline-block;
-        width: 3px;
-        height: 1.05em;
-        margin-left: 3px;
-        background: var(--primary);
-        vertical-align: -0.13em;
-        animation: blink 1s steps(2, jump-none) infinite;
-      }
-      @keyframes blink {
-        50% {
-          opacity: 0.2;
-        }
-      }
+    .section-stack { display: grid; gap: 14px; margin-top: 16px; }
+    .journey { padding: 20px; }
+    .section-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 16px;
+    }
+    .section-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+    .journey-label {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 9px;
+      background: var(--blue-soft);
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+    .journey-description { color: var(--muted); font-size: 13px; }
+    .stage-count {
+      flex: none;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .pipeline {
+      position: relative;
+      display: grid;
+      gap: 11px;
+    }
+    .pipeline.prepare { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .pipeline.answer { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    .pipeline::before {
+      content: "";
+      position: absolute;
+      left: 6%;
+      right: 6%;
+      top: 35px;
+      height: 1px;
+      background: var(--border-strong);
+    }
+    .stage {
+      position: relative;
+      min-width: 0;
+      min-height: 108px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 12px 8px;
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      background: var(--surface);
+      cursor: pointer;
+      transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+    }
+    .stage:hover {
+      transform: translateY(-3px);
+      border-color: color-mix(in srgb, var(--blue) 38%, var(--border));
+      box-shadow: 0 10px 24px color-mix(in srgb, var(--blue) 8%, transparent);
+    }
+    .stage.selected {
+      border-color: color-mix(in srgb, var(--blue) 65%, var(--border));
+      background: linear-gradient(145deg, var(--blue-soft), var(--surface));
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blue) 16%, transparent);
+    }
+    .stage.related {
+      border-color: color-mix(in srgb, var(--purple) 52%, var(--border));
+      background: linear-gradient(145deg, var(--purple-soft), var(--surface));
+    }
+    .stage-icon {
+      position: relative;
+      z-index: 1;
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--border-strong);
+      border-radius: 50%;
+      background: var(--surface-2);
+      color: var(--blue);
+    }
+    .stage.selected .stage-icon {
+      border-color: var(--blue);
+      background: var(--blue);
+      color: white;
+    }
+    .stage.related .stage-icon { color: var(--purple); border-color: color-mix(in srgb, var(--purple) 45%, var(--border)); }
+    .stage-icon svg { width: 20px; height: 20px; stroke-width: 1.8; }
+    .stage-name {
+      min-width: 0;
+      font-size: 13px;
+      font-weight: 760;
+      line-height: 1.25;
+      text-align: center;
+    }
+    .stage-number {
+      position: absolute;
+      top: 8px;
+      left: 10px;
+      color: var(--muted);
+      font: 10px var(--mono);
+    }
+    .stage-reranker {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--green);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
 
-      .privacy-note {
-        margin-top: 54px;
-        padding: 24px;
-        border-radius: 18px;
-      }
-      .privacy-note strong {
-        display: block;
-        margin-bottom: 7px;
-      }
-      .footer {
-        display: flex;
-        justify-content: space-between;
-        gap: 20px;
-        margin-top: 30px;
-        color: var(--muted);
-        font-size: 0.78rem;
-      }
-      .footer a:hover {
-        color: var(--text);
-      }
+    .connections { margin-top: 16px; padding: 20px; }
+    .connection-intro {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 15px;
+    }
+    .connection-intro h2 { margin: 0; font-size: 15px; }
+    .connection-intro h3 { margin: 0; font-size: 14px; }
+    .connection-intro p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .hint {
+      flex: none;
+      padding: 6px 9px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--muted);
+      background: var(--surface-2);
+      font-size: 11px;
+    }
+    .connection-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 11px;
+    }
+    .connection {
+      min-width: 0;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface-2);
+      text-align: left;
+      cursor: pointer;
+      transition: border-color .18s ease, transform .18s ease, background .18s ease;
+    }
+    .connection:hover { transform: translateY(-2px); border-color: var(--border-strong); }
+    .connection.active {
+      border-color: color-mix(in srgb, var(--blue) 55%, var(--border));
+      background: color-mix(in srgb, var(--blue-soft) 70%, var(--surface));
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--blue) 14%, transparent);
+    }
+    .connection-kind {
+      color: var(--blue);
+      font-size: 10px;
+      font-weight: 850;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+    .connection-path {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 58px minmax(0, 1fr);
+      align-items: center;
+      gap: 7px;
+      margin: 12px 0 10px;
+    }
+    .endpoint {
+      min-width: 0;
+      padding: 7px 8px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--surface);
+      font-size: 11px;
+      font-weight: 750;
+      line-height: 1.25;
+      text-align: center;
+    }
+    .connector-line {
+      position: relative;
+      height: 2px;
+      background: var(--blue);
+    }
+    .connector-line::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      top: 50%;
+      width: 7px;
+      height: 7px;
+      border-top: 2px solid var(--blue);
+      border-right: 2px solid var(--blue);
+      transform: translateY(-50%) rotate(45deg);
+    }
+    .connection.active .connector-line::before {
+      content: "";
+      position: absolute;
+      top: -3px;
+      left: 0;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--blue);
+      animation: travel 1.65s ease-in-out infinite;
+    }
+    @keyframes travel { from { left: 0; opacity: 0; } 20% { opacity: 1; } to { left: calc(100% - 8px); opacity: 0; } }
+    .connection strong { display: block; font-size: 12px; }
+    .connection p { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 
-      @media (max-width: 820px) {
-        .summary-grid,
-        .detail-panel {
-          grid-template-columns: 1fr;
-        }
-        .stage-row {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-        .section-heading {
-          display: block;
-        }
-        .visual-flow {
-          grid-template-columns: 1fr;
-        }
-      }
-      @media (max-width: 520px) {
-        .shell {
-          width: min(100% - 20px, 1120px);
-          padding-top: 32px;
-        }
-        .summary-grid {
-          margin: 32px 0 48px;
-        }
-        .journey,
-        .detail-panel {
-          padding: 14px;
-        }
-        .stage-row,
-        .io-grid {
-          grid-template-columns: 1fr;
-        }
-        .journey-header,
-        .footer {
-          align-items: flex-start;
-          flex-direction: column;
-        }
-      }
-      @media (prefers-reduced-motion: reduce) {
-        html {
-          scroll-behavior: auto;
-        }
-        .stage,
-        .cursor {
-          animation: none;
-          transition: none;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <main class="shell">
-      <p class="eyebrow">RavnDock · Retrieval-augmented generation</p>
-      <h1>What happens behind the scenes</h1>
-      <p class="intro">
-        RAG lets a local chat model answer with evidence from your files. RavnDock first prepares a
-        searchable local index, then retrieves the most useful passages for each question.
-      </p>
-      <div class="local-pill">Runs locally on this Mac</div>
+    .inspector {
+      margin-top: 16px;
+      overflow: hidden;
+      scroll-margin-top: 82px;
+    }
+    .inspector-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 15px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+    .step-progress { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .progress-track {
+      width: 150px;
+      height: 5px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: var(--surface-3);
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--blue), var(--purple));
+      transition: width .25s ease;
+    }
+    .progress-label { color: var(--muted); font: 11px var(--mono); }
+    .step-controls { display: flex; gap: 7px; }
+    .small-button {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 11px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 680;
+    }
+    .small-button:hover { border-color: var(--border-strong); background: var(--surface-3); }
+    .small-button:disabled { cursor: not-allowed; opacity: .4; }
+    .inspector-body {
+      display: grid;
+      grid-template-columns: minmax(270px, .72fr) minmax(0, 1.55fr);
+      min-height: 410px;
+    }
+    .stage-copy {
+      padding: 26px;
+      border-right: 1px solid var(--border);
+    }
+    .stage-heading {
+      display: flex;
+      align-items: flex-start;
+      gap: 13px;
+    }
+    .stage-heading .large-icon {
+      width: 50px;
+      height: 50px;
+      flex: none;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      background: var(--blue);
+      color: white;
+    }
+    .large-icon svg { width: 24px; height: 24px; }
+    .step-kicker {
+      margin: 0;
+      color: var(--blue);
+      font-size: 11px;
+      font-weight: 850;
+      letter-spacing: .04em;
+    }
+    .stage-copy h2 {
+      margin: 4px 0 0;
+      font-size: 21px;
+      line-height: 1.2;
+      letter-spacing: -.02em;
+    }
+    .stage-detail { margin: 19px 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+    .io-flow {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    .io-card {
+      padding: 11px 12px;
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      background: var(--surface-2);
+    }
+    .io-card span {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 850;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+    .io-card strong { display: block; font-size: 11px; line-height: 1.5; }
+    .key-idea, .relation-note {
+      margin-top: 11px;
+      padding: 11px 12px;
+      border-radius: 11px;
+      font-size: 11px;
+      line-height: 1.55;
+    }
+    .key-idea {
+      border: 1px solid color-mix(in srgb, var(--blue) 24%, var(--border));
+      background: var(--blue-soft);
+      color: var(--blue-strong);
+    }
+    .key-idea strong, .relation-note strong { display: block; margin-bottom: 2px; color: var(--text); }
+    .relation-note {
+      border: 1px solid color-mix(in srgb, var(--purple) 30%, var(--border));
+      background: var(--purple-soft);
+      color: var(--muted);
+    }
+    .example {
+      min-width: 0;
+      padding: 22px;
+      background: var(--surface);
+    }
+    .example-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    .example-title {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 850;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+    .illustrative {
+      padding: 5px 9px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--muted);
+      font-size: 10px;
+    }
+    .process-demo-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 850;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
 
-      <section class="summary-grid" aria-label="RAG in three steps">
-        <article class="summary-card card">
-          <strong>1 · Prepare</strong>
-          <p>Read files, preserve locations, split useful passages, and build a local index.</p>
-        </article>
-        <article class="summary-card card">
-          <strong>2 · Retrieve</strong>
-          <p>Search by meaning and exact terms, then focus the best evidence for the question.</p>
-        </article>
-        <article class="summary-card card">
-          <strong>3 · Generate + verify</strong>
-          <p>
-            Stream a grounded answer, check its citations, and link claims back to source files.
-          </p>
-        </article>
-      </section>
+    .demo-card, .code-card, .source-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface-2);
+    }
+    .demo-card { padding: 14px; }
+    .demo-label {
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 7px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 650;
+    }
+    .tag.blue { border-color: color-mix(in srgb, var(--blue) 28%, var(--border)); background: var(--blue-soft); color: var(--blue); }
+    .tag.green { border-color: color-mix(in srgb, var(--green) 28%, var(--border)); background: var(--green-soft); color: var(--green); }
+    .tag.purple { border-color: color-mix(in srgb, var(--purple) 28%, var(--border)); background: var(--purple-soft); color: var(--purple); }
+    .file-list { overflow: hidden; border: 1px solid var(--border); border-radius: 12px; }
+    .file-row, .db-row, .source-row {
+      width: 100%;
+      display: grid;
+      align-items: center;
+      gap: 10px;
+      border: 0;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+      text-align: left;
+      cursor: pointer;
+    }
+    .file-row { grid-template-columns: 30px minmax(0, 1fr) auto auto; padding: 11px 12px; }
+    .file-row:last-child, .db-row:last-child, .source-row:last-child { border-bottom: 0; }
+    .file-row:hover, .db-row:hover, .source-row:hover { background: var(--surface-3); }
+    .file-row.active { background: var(--blue-soft); }
+    .file-glyph { color: var(--blue); font-weight: 800; }
+    .file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 700; }
+    .file-meta { color: var(--muted); font-size: 10px; }
+    .preview-strip {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid color-mix(in srgb, var(--blue) 24%, var(--border));
+      border-radius: 10px;
+      background: var(--blue-soft);
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+    .three-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .source-map { padding: 13px; }
+    .source-map strong { display: block; margin-bottom: 8px; font-size: 12px; }
+    .source-map p { margin: 3px 0; color: var(--muted); font-size: 11px; }
+    .code-card {
+      padding: 14px;
+      font: 11px/1.7 var(--mono);
+      white-space: pre-wrap;
+    }
+    .code-blue { color: var(--blue); }
+    .chunk-card {
+      min-height: 155px;
+      padding: 13px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface-2);
+      cursor: pointer;
+      transition: border-color .18s ease, transform .18s ease;
+    }
+    .chunk-card:hover, .chunk-card.active { transform: translateY(-2px); border-color: var(--blue); }
+    .chunk-top { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; }
+    .chunk-top strong { color: var(--blue); }
+    .chunk-top span { color: var(--muted); }
+    .chunk-card p { margin: 16px 0 0; font-size: 12px; line-height: 1.6; }
+    .overlap {
+      margin-top: 13px;
+      padding: 6px 8px;
+      border-radius: 7px;
+      background: var(--blue-soft);
+      color: var(--blue);
+      font-size: 10px;
+    }
+    .transform {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 54px minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+    }
+    .transform-arrow {
+      position: relative;
+      height: 2px;
+      background: var(--blue);
+    }
+    .transform-arrow::after {
+      content: "";
+      position: absolute;
+      right: 0;
+      top: -4px;
+      width: 8px;
+      height: 8px;
+      border-top: 2px solid var(--blue);
+      border-right: 2px solid var(--blue);
+      transform: rotate(45deg);
+    }
+    .vector-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 7px; margin-top: 12px; }
+    .vector-cell {
+      padding: 9px 3px;
+      border: 1px solid color-mix(in srgb, var(--blue) 25%, var(--border));
+      border-radius: 8px;
+      background: var(--blue-soft);
+      color: var(--blue);
+      font: 10px var(--mono);
+      text-align: center;
+    }
+    .fineprint { margin: 10px 0 0; color: var(--muted); font-size: 10px; line-height: 1.6; }
+    .db-table { overflow: hidden; border: 1px solid var(--border); border-radius: 12px; }
+    .db-head, .db-row { grid-template-columns: 60px 1.15fr 95px 1.5fr .9fr; padding: 9px 11px; }
+    .db-head {
+      display: grid;
+      gap: 9px;
+      background: var(--surface-3);
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 850;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+    .db-row { font-size: 10px; }
+    .db-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mono { font-family: var(--mono); color: var(--blue); }
+    .prompt {
+      padding: 15px;
+      border-radius: 13px;
+      background: var(--blue);
+      color: white;
+      font-size: 14px;
+      font-weight: 650;
+    }
+    .tokens { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 13px; }
+    .token {
+      padding: 6px 8px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--surface-2);
+      font: 10px var(--mono);
+    }
+    .similarity-bars { display: grid; gap: 10px; margin-top: 13px; }
+    .bar-row { display: grid; grid-template-columns: 120px minmax(0, 1fr) 38px; align-items: center; gap: 9px; font-size: 10px; }
+    .bar-row span:first-child { color: var(--muted); }
+    .bar {
+      height: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: var(--surface-3);
+    }
+    .bar > i { display: block; height: 100%; border-radius: inherit; background: var(--blue); }
+    .weight-panel {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 12px;
+      padding: 13px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface-2);
+    }
+    .weight-box strong { display: block; color: var(--blue); font-size: 13px; }
+    .weight-box span { color: var(--muted); font-size: 10px; }
+    .weight-box:last-child { text-align: right; }
+    .weight-total { color: var(--muted); font: 10px var(--mono); }
+    .weight-slider { width: 100%; margin: 13px 0 7px; accent-color: var(--blue); }
+    .result-list { display: grid; gap: 8px; margin-top: 13px; }
+    .result {
+      display: grid;
+      grid-template-columns: 30px minmax(0, 1fr) 55px;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 11px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-2);
+      transition: transform .24s ease;
+    }
+    .rank {
+      width: 27px;
+      height: 27px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--blue-soft);
+      color: var(--blue);
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .result strong, .result span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .result strong { display: block; font-size: 11px; }
+    .result span { display: block; color: var(--muted); font-size: 10px; }
+    .result-score { color: var(--blue); font: 12px var(--mono); text-align: right; }
+    .score-note {
+      margin-top: 11px;
+      padding: 10px 11px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-2);
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.6;
+    }
+    .score-note strong { color: var(--text); }
+    .rerank-grid { display: grid; grid-template-columns: 1fr 54px 1fr; align-items: center; gap: 10px; }
+    .rank-column { display: grid; gap: 7px; }
+    .rank-column h3 { margin: 0 0 2px; color: var(--muted); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+    .rank-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 10px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--surface-2);
+      font-size: 11px;
+    }
+    .rank-item.best { border-color: color-mix(in srgb, var(--blue) 40%, var(--border)); background: var(--blue-soft); }
+    .rank-item.flash { animation: flash .75s ease; }
+    @keyframes flash { 0% { transform: translateX(-8px); opacity: .3; } 100% { transform: translateX(0); opacity: 1; } }
+    .rerank-center { text-align: center; color: var(--blue); }
+    .rerank-center svg { width: 25px; height: 25px; }
+    .model-chip {
+      margin-top: 11px;
+      padding: 8px 10px;
+      border: 1px solid color-mix(in srgb, var(--green) 25%, var(--border));
+      border-radius: 9px;
+      background: var(--green-soft);
+      color: var(--green);
+      font: 10px var(--mono);
+      text-align: center;
+    }
+    .evidence-layout { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 11px; }
+    .check-list { display: grid; gap: 8px; }
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px;
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      background: var(--surface-2);
+      font-size: 10px;
+    }
+    .check-mark { color: var(--green); font-weight: 900; }
+    .generation-inputs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+    .generation-input { padding: 11px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-2); }
+    .generation-input strong { display: block; font-size: 11px; }
+    .generation-input .source { display: block; margin: 4px 0; color: var(--blue); font-size: 9px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+    .generation-input p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+    .combine-arrow { margin: 9px 0; color: var(--blue); font-size: 10px; font-weight: 750; text-align: center; }
+    .stream-box {
+      min-height: 95px;
+      padding: 14px;
+      border: 1px solid color-mix(in srgb, var(--blue) 25%, var(--border));
+      border-radius: 12px;
+      background: var(--blue-soft);
+    }
+    .stream-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
+    .stream-head strong { color: var(--blue); font-size: 10px; letter-spacing: .08em; }
+    .stream-text { font-size: 13px; line-height: 1.7; }
+    .stream-token { padding: 2px 3px; border-radius: 4px; background: var(--surface); }
+    .cursor { display: inline-block; width: 2px; height: 16px; margin-left: 2px; background: var(--blue); vertical-align: -3px; animation: blink .85s infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .source-row { grid-template-columns: 24px minmax(0, 1fr) auto; padding: 10px 11px; }
+    .source-row strong { font-size: 11px; }
+    .source-row span { color: var(--muted); font-size: 10px; }
+    .source-preview { display: none; margin-top: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); font-size: 11px; line-height: 1.65; }
+    .source-preview.visible { display: block; }
 
-      <section aria-labelledby="journeys-title">
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      margin-top: 17px;
+      padding: 0 4px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .kbd {
+      padding: 2px 5px;
+      border: 1px solid var(--border);
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      background: var(--surface);
+      font: 9px var(--mono);
+    }
+
+    @media (max-width: 1050px) {
+      .hero { grid-template-columns: 1fr 290px; gap: 24px; }
+      .pipeline.answer { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .pipeline.answer::before { display: none; }
+      .inspector-body { grid-template-columns: minmax(250px, .7fr) minmax(0, 1.3fr); }
+      .db-head, .db-row { grid-template-columns: 54px 1fr 85px 1.2fr; }
+      .db-head span:last-child, .db-row span:last-child { display: none; }
+    }
+    @media (max-width: 860px) {
+      .topnav { display: none; }
+      .hero { grid-template-columns: 1fr; }
+      .model-stack { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .model-row { grid-template-columns: 1fr; gap: 2px; padding: 0 10px 0 0; border: 0; border-right: 1px solid var(--border); }
+      .model-row:last-child { border-right: 0; }
+      .pipeline.prepare { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .pipeline.prepare::before { display: none; }
+      .connection-grid { grid-template-columns: 1fr; }
+      .connection-path { grid-template-columns: minmax(0, 1fr) 90px minmax(0, 1fr); }
+      .inspector-body { grid-template-columns: 1fr; }
+      .stage-copy { border-right: 0; border-bottom: 1px solid var(--border); }
+      .evidence-layout { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 620px) {
+      .topbar-inner, .page { width: min(100% - 20px, 1280px); }
+      .topbar-inner { min-height: 58px; }
+      .brand > span:last-child { display: none; }
+      .toolbar { margin-left: auto; gap: 6px; padding-left: 8px; }
+      #presentButton { display: none; }
+      .tool-button { width: 44px; min-height: 44px; }
+      .primary-button { min-height: 44px; padding: 0 14px; font-size: 12px; }
+      .tour-full { display: none; }
+      .tour-mobile { display: inline; }
+      .page { padding-top: 20px; }
+      .hero, .journey, .connections { padding: 16px; border-radius: 15px; }
+      .hero { gap: 20px; }
+      .eyebrow { font-size: 10px; }
+      .hero-copy { font-size: 13px; }
+      .model-stack { grid-template-columns: 1fr; padding: 13px; }
+      .model-row { grid-template-columns: 90px 1fr; padding: 0 0 9px; border-right: 0; border-bottom: 1px solid var(--border); }
+      .pipeline.prepare, .pipeline.answer { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .stage { min-height: 94px; gap: 6px; padding: 10px 6px; }
+      .stage-icon { width: 38px; height: 38px; }
+      .stage-icon svg { width: 18px; height: 18px; }
+      .stage-name { font-size: 12px; }
+      .stage-number { top: 6px; left: 8px; }
+      .stage-reranker { top: 6px; right: 6px; }
+      .section-heading { align-items: flex-start; }
+      .connection-intro { display: grid; gap: 8px; margin-bottom: 12px; }
+      .section-title-group { display: grid; gap: 7px; }
+      .stage-count { display: none; }
+      .hint { width: max-content; padding: 5px 8px; font-size: 10px; }
+      .connection-grid { gap: 8px; }
+      .connection { padding: 11px; }
+      .connection-path { grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr); margin: 9px 0 8px; }
+      .endpoint { padding: 7px 5px; font-size: 10px; }
+      .connection strong { font-size: 11px; }
+      .connection p { display: none; }
+      .connection.active p { display: block; }
+      .inspector-top { align-items: flex-start; padding: 12px; }
+      .progress-track { width: 80px; }
+      .small-button { min-width: 44px; min-height: 44px; padding: 0 13px; }
+      .small-button .button-text { display: none; }
+      .stage-copy, .example { padding: 17px; }
+      .example-header, .process-demo-heading { align-items: flex-start; }
+      .two-col, .three-col, .generation-inputs { grid-template-columns: 1fr; }
+      .transform { grid-template-columns: 1fr; }
+      .transform-arrow { width: 2px; height: 34px; margin: 0 auto; }
+      .transform-arrow::after { right: -3px; top: auto; bottom: 0; transform: rotate(135deg); }
+      .vector-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .file-row { grid-template-columns: 24px minmax(0, 1fr) auto; }
+      .file-meta { display: none; }
+      .db-table { overflow: visible; }
+      .db-head { display: none; }
+      .db-row { min-width: 0; grid-template-columns: 50px minmax(0, 1fr); gap: 4px 10px; padding: 12px; }
+      .db-row span:nth-child(1) { grid-row: 1 / 3; align-self: center; }
+      .db-row span:nth-child(2) { grid-column: 2; font-weight: 700; }
+      .db-row span:nth-child(3) { grid-column: 2; color: var(--muted); }
+      .db-row span:nth-child(4) { grid-column: 1 / -1; margin-top: 5px; white-space: normal; }
+      .db-row span:nth-child(5) { display: block; grid-column: 1 / -1; margin-top: 2px; }
+      .weight-panel { grid-template-columns: 1fr; gap: 6px; }
+      .weight-box:last-child { text-align: left; }
+      .weight-total { display: none; }
+      .rerank-grid { grid-template-columns: 1fr; }
+      .rerank-center { transform: rotate(90deg); }
+      .footer { display: block; }
+      .footer span:last-child { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+    @media print {
+      .topbar, .step-controls, .footer { display: none; }
+      body { background: white; }
+      .page { width: 100%; padding: 0; }
+      .hero, .journey, .connections, .inspector { box-shadow: none; break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m12 2 8 4-8 4-8-4 8-4Z"/><path d="m4 10 8 4 8-4M4 14l8 4 8-4"/></svg>
+        </span>
+        <span>RAG Behind the Scenes</span>
+      </div>
+      <nav class="topnav" aria-label="Page sections">
+        <a href="#overview">Overview</a>
+        <a href="#journey-one">Prepare knowledge</a>
+        <a href="#journey-two">Answer a question</a>
+      </nav>
+      <div class="toolbar">
+        <button class="tool-button app-back-button" id="appBackButton" type="button" aria-label="Back to Advanced Settings" title="Back to Advanced Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <button class="tool-button" id="themeButton" type="button" aria-label="Switch color theme" title="Switch color theme"></button>
+        <button class="tool-button" id="presentButton" type="button" aria-label="Enter presentation mode" title="Enter presentation mode">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        </button>
+        <button class="primary-button" id="tourButton" type="button"><span class="tour-full">Start guided tour</span><span class="tour-mobile">Tour</span></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page" id="overview">
+    <section class="hero" aria-labelledby="page-title">
+      <div>
+        <div class="eyebrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m12 2 8 4-8 4-8-4 8-4Z"/><path d="m4 10 8 4 8-4M4 14l8 4 8-4"/></svg>
+          Retrieval-Augmented Generation
+        </div>
+        <h1 id="page-title">The model answers with evidence from your files</h1>
+        <p class="hero-copy">Follow a local document as it becomes searchable, then follow a user question through retrieval, reranking, grounded generation, and citation checks. Select any process to inspect what goes in and what comes out.</p>
+        <span class="local-note">
+          <span aria-hidden="true">▣</span>
+          Static, offline customer walkthrough
+        </span>
+      </div>
+      <div class="model-stack" aria-label="Models and storage used in this walkthrough">
+        <div class="model-row">
+          <span class="model-label">Embedding</span>
+          <span class="model-value" id="embeddingModelValue">qwen3-embedding:4b</span>
+        </div>
+        <div class="model-row">
+          <span class="model-label">Reranker</span>
+          <span class="model-value on-badge" id="rerankerModelValue"><span class="on-dot"></span><span id="rerankerModelText">BAAI/bge-reranker-v2-m3</span></span>
+        </div>
+        <div class="model-row">
+          <span class="model-label">Vector store</span>
+          <span class="model-value">LanceDB · local</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="section-stack">
+      <section class="journey" id="journey-one" aria-labelledby="journey-one-title">
         <div class="section-heading">
-          <div>
-            <p class="eyebrow">Interactive walkthrough</p>
-            <h2 id="journeys-title">Two connected journeys</h2>
+          <div class="section-title-group">
+            <span class="journey-label" id="journey-one-title">Journey 1 · Prepare knowledge</span>
+            <span class="journey-description">Runs when local files are indexed or updated</span>
           </div>
-          <p class="section-copy">
-            Select a stage to see what goes in, what comes out, and why it matters. Preparing files
-            does not retrain the chat model; it builds searchable data derived from them.
-          </p>
+          <span class="stage-count">5 processes</span>
         </div>
-
-        <div class="journeys">
-          <article class="journey card">
-            <div class="journey-header">
-              <span class="journey-label">Journey 1 · Prepare knowledge</span
-              ><span class="journey-note">Runs when local files are synchronized</span>
-            </div>
-            <div class="stage-row" style="--count: 5" id="prepare-stages"></div>
-          </article>
-          <article class="journey card">
-            <div class="journey-header">
-              <span class="journey-label">Journey 2 · Answer a question</span
-              ><span class="journey-note">Uses the prepared index for every prompt</span>
-            </div>
-            <div class="stage-row" style="--count: 7" id="answer-stages"></div>
-          </article>
-        </div>
-
-        <article class="detail-panel card" aria-live="polite">
-          <div>
-            <p class="detail-step" id="detail-step"></p>
-            <h3 id="detail-title"></h3>
-            <p class="detail-copy" id="detail-copy"></p>
-            <div class="io-grid">
-              <div class="io-card">
-                <span>Input</span>
-                <p id="detail-input"></p>
-              </div>
-              <div class="io-card">
-                <span>Output</span>
-                <p id="detail-output"></p>
-              </div>
-            </div>
-          </div>
-          <div class="stage-visual" id="stage-visual"></div>
-        </article>
+        <div class="pipeline prepare" id="preparePipeline"></div>
       </section>
 
-      <aside class="privacy-note card">
-        <strong>Privacy and accuracy</strong>
-        <p>
-          Files, derived search data, prompts, and model inference stay on the Mac. The examples on
-          this page are illustrative rather than live customer data. RAG improves grounding, but
-          important answers should still be checked through their source citations.
-        </p>
-      </aside>
+      <section class="journey" id="journey-two" aria-labelledby="journey-two-title">
+        <div class="section-heading">
+          <div class="section-title-group">
+            <span class="journey-label" id="journey-two-title">Journey 2 · Answer a question</span>
+            <span class="journey-description">Uses the prepared index for every prompt</span>
+          </div>
+          <span class="stage-count" id="answerStageCount">7 processes · reranker on</span>
+        </div>
+        <div class="pipeline answer" id="answerPipeline"></div>
+      </section>
+    </div>
 
-      <footer class="footer">
-        <span>RavnDock · Private answers from your files</span
-        ><a href="../README.md">Return to README</a>
-      </footer>
-    </main>
+    <section class="inspector" id="inspector" aria-live="polite">
+      <div class="inspector-top">
+        <div class="step-progress">
+          <div class="progress-track" aria-hidden="true"><div class="progress-fill" id="progressFill"></div></div>
+          <span class="progress-label" id="progressLabel"></span>
+        </div>
+        <div class="step-controls">
+          <button class="small-button" id="previousButton" type="button" aria-label="Previous process">← <span class="button-text">Previous</span></button>
+          <button class="small-button" id="nextButton" type="button" aria-label="Next process"><span class="button-text">Next</span> →</button>
+        </div>
+      </div>
+      <div class="inspector-body">
+        <article class="stage-copy" id="stageCopy"></article>
+        <div class="example" id="stageExample"></div>
+      </div>
+    </section>
 
-    <script>
-      const stages = [
-        [
-          'local-folder',
-          'prepare',
-          1,
-          'Local files',
-          'Local knowledge folder',
-          'You choose which private files belong to the knowledge base. Originals remain in place and are never changed by indexing.',
-          'PDF, Word, PowerPoint, Excel, CSV, Markdown, text, and images',
-          'A local file manifest with names, types, and change fingerprints'
-        ],
-        [
-          'extract',
-          'prepare',
-          2,
-          'Read files',
-          'Read and preserve structure',
-          'Local readers extract text, tables, headings, and precise page, slide, sheet, cell, heading, or line locations.',
-          'A source document',
-          'Structured text plus precise source metadata'
-        ],
-        [
-          'chunk',
-          'prepare',
-          3,
-          'Chunk',
-          'Split into useful sections',
-          'Long files become smaller overlapping passages, making focused retrieval possible without losing nearby context.',
-          'Structured document text',
-          'Searchable passages with source locations and overlap'
-        ],
-        [
-          'document-embedding',
-          'prepare',
-          4,
-          'Embed',
-          'Create document embeddings',
-          'A local embedding model turns each passage into numbers that represent meaning, so related ideas can match even when wording differs.',
-          'One text passage',
-          'A high-dimensional numeric vector'
-        ],
-        [
-          'vector-database',
-          'prepare',
-          5,
-          'Vector DB',
-          'Store the searchable index',
-          'LanceDB stores passages, vectors, keywords, and citation metadata together as local derived search data.',
-          'Passages, vectors, keywords, and metadata',
-          'A local searchable index linked to the originals'
-        ],
-        [
-          'user-prompt',
-          'answer',
-          1,
-          'Question',
-          'Understand the question',
-          'RavnDock keeps the request intact and identifies named files, sheets, recent context, and the likely retrieval mode.',
-          'The user prompt',
-          'Tokens, source scope, and retrieval mode'
-        ],
-        [
-          'query-embedding',
-          'answer',
-          2,
-          'Embed query',
-          'Embed the question',
-          'The same local embedding model places the question in the document vector space so meaning can be compared.',
-          'The retrieval question',
-          'A query vector compatible with document vectors'
-        ],
-        [
-          'hybrid-search',
-          'answer',
-          3,
-          'Retrieve',
-          'Search by meaning and keywords',
-          'Hybrid retrieval combines vector similarity with exact-term matching and filters results to the active knowledge base and source scope.',
-          'Question text, query vector, source scope, and index',
-          'Candidate passages ranked for relevance'
-        ],
-        [
-          'reranker',
-          'answer',
-          4,
-          'Rerank',
-          'Rerank ambiguous matches',
-          'When enabled and useful, a local reranker reads the question and candidates together. Direct lookups and other clear cases can skip it.',
-          'Question plus retrieved candidates',
-          'A more focused passage order'
-        ],
-        [
-          'grounded-context',
-          'answer',
-          5,
-          'Prepare evidence',
-          'Prepare evidence for the model',
-          'The strongest passages become a compact evidence package. Source labels such as [1] preserve the path back to each original location.',
-          'Retrieved passages and source metadata',
-          'Grounded evidence labeled [1], [2], and so on'
-        ],
-        [
-          'output-tokens',
-          'answer',
-          6,
-          'Generate',
-          'Generate output tokens',
-          'RavnDock combines answer rules, user context, and grounded evidence. The local chat model then streams a draft answer one token at a time.',
-          'Answer rules, user context, and grounded evidence',
-          'A streamed draft answer with citation markers'
-        ],
-        [
-          'verify-citations',
-          'answer',
-          7,
-          'Verify',
-          'Check sources and deliver',
-          'RavnDock checks citation markers and factual support. Weakly grounded drafts can be replaced with a safer source-supported answer.',
-          'The streamed draft, evidence, and citation map',
-          'The final answer plus clickable source citations'
-        ]
-      ].map(([id, phase, number, short, title, copy, input, output]) => ({
-        id,
-        phase,
-        number,
-        short,
-        title,
-        copy,
-        input,
-        output
-      }))
+    <section class="connections" aria-labelledby="connections-title">
+      <div class="connection-intro">
+        <div>
+          <h2 id="connections-title">How Journey 1 powers Journey 2</h2>
+          <p>Your files build a searchable local index. They do not retrain the chat model.</p>
+        </div>
+        <span class="hint">Select a connection to trace it</span>
+      </div>
+      <div class="connection-grid" id="connectionGrid"></div>
+    </section>
 
-      const visual = document.querySelector('#stage-visual')
-      const genericVisual = (stage) =>
-        `<div class="visual-label">${stage.short.toUpperCase()} · LOCAL PROCESS</div><div class="visual-flow"><div class="visual-item"><strong>Input</strong>${stage.input}</div><div class="visual-item"><strong>Process</strong>${stage.title}</div><div class="visual-item"><strong>Output</strong>${stage.output}</div></div><p class="detail-copy">Each step keeps the evidence connected to its original source location.</p>`
-      const tokenVisual = () =>
-        `<div class="visual-flow"><div class="visual-item"><strong>Answer rules</strong>How to use evidence safely</div><div class="visual-item"><strong>User context</strong>The question being answered</div><div class="visual-item"><strong>Grounded evidence</strong>Passages labeled [1], [2]</div></div><div class="visual-label">LOCAL CHAT MODEL · STREAMING</div><p class="answer">Production <span class="token">changes</span> require <span class="token">an approved</span> <span class="token">change record</span> and <span class="token">a second reviewer</span> <span style="color:var(--primary)">[1]</span><span class="cursor"></span></p>`
+    <footer class="footer">
+      <span>All documents, vectors, scores, and token boundaries are representative teaching examples.</span>
+      <span>Tip: use <kbd class="kbd">←</kbd> <kbd class="kbd">→</kbd> to move between processes.</span>
+    </footer>
+  </main>
 
-      function selectStage(id) {
-        const stage = stages.find((candidate) => candidate.id === id)
-        if (!stage) return
-        document
-          .querySelectorAll('.stage')
-          .forEach((button) =>
-            button.setAttribute('aria-pressed', String(button.dataset.stage === id))
-          )
-        document.querySelector('#detail-step').textContent =
-          `${stage.phase === 'prepare' ? 'Journey 1' : 'Journey 2'} · Step ${stage.number}`
-        document.querySelector('#detail-title').textContent = stage.title
-        document.querySelector('#detail-copy').textContent = stage.copy
-        document.querySelector('#detail-input').textContent = stage.input
-        document.querySelector('#detail-output').textContent = stage.output
-        visual.innerHTML = id === 'output-tokens' ? tokenVisual() : genericVisual(stage)
+  <script>
+    (function () {
+      "use strict";
+
+      var icons = {
+        folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H9l2 2h7.5A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5v-10Z"/></svg>',
+        read: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v5h5M9 12h6M9 16h4"/></svg>',
+        chunk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="6" cy="7" r="3"/><circle cx="6" cy="17" r="3"/><path d="m8.6 8.5 11 6.5M8.6 15.5 20 9M14 12l6-3"/></svg>',
+        embed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 4v4M5 16v4M12 2v6M12 16v6M19 5v3M19 16v3"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
+        database: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>',
+        question: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 14a4 4 0 0 1-4 4H8l-5 3V6a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/><path d="M9.5 8.2a2.7 2.7 0 1 1 4 2.3c-1 .6-1.5 1-1.5 2M12 15.5h.01"/></svg>',
+        query: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m12 3 1.1 3.1L16 7.2l-2.9 1.1L12 11.5l-1.1-3.2L8 7.2l2.9-1.1L12 3ZM6 13l.8 2.2L9 16l-2.2.8L6 19l-.8-2.2L3 16l2.2-.8L6 13ZM18 12l.8 2.2 2.2.8-2.2.8L18 18l-.8-2.2L15 15l2.2-.8L18 12Z"/></svg>',
+        search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/></svg>',
+        rerank: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h13M4 12h10M4 18h7M19 4v16M16 17l3 3 3-3"/></svg>',
+        evidence: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 10H4a4 4 0 0 1 4-4v8a4 4 0 0 1-4 4M20 10h-4a4 4 0 0 1 4-4v8a4 4 0 0 1-4 4"/></svg>',
+        generate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="6" width="16" height="13" rx="3"/><path d="M9 10h.01M15 10h.01M9 15h6M12 6V3"/></svg>',
+        verify: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2 20 6v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>',
+        sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/></svg>',
+        moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20.5 14.2A8.3 8.3 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/></svg>'
+      };
+
+      var stages = [
+        {
+          id: "local-folder", phase: "prepare", number: 1, icon: "folder", short: "Local files",
+          title: "Choose the local knowledge base",
+          detail: "The customer selects a folder containing the private documents the RAG system is allowed to use. Indexing reads those files without changing the originals.",
+          input: "PDF, Word, PowerPoint, Excel, CSV, Markdown, text, and images",
+          output: "A file manifest with names, types, timestamps, and change fingerprints",
+          idea: "The folder is the source of truth. RAG uses it as evidence; it does not train the chat model on these files."
+        },
+        {
+          id: "extract", phase: "prepare", number: 2, icon: "read", short: "Read files",
+          title: "Read and preserve document structure",
+          detail: "A local parser extracts text, tables, headings, and source locations. OCR can read scanned pages. Page, slide, sheet, cell, heading, and line references stay attached.",
+          input: "A source document such as Security_Guide.pdf",
+          output: "Structured text plus precise source metadata",
+          idea: "Location metadata is what makes later citations traceable."
+        },
+        {
+          id: "chunk", phase: "prepare", number: 3, icon: "chunk", short: "Chunk",
+          title: "Split documents into useful passages",
+          detail: "Long files are divided into smaller, overlapping sections. Smaller passages are easier to retrieve precisely, while overlap protects ideas that cross a boundary.",
+          input: "Structured document text and its source map",
+          output: "Searchable chunks with headings, overlap, and source locations",
+          idea: "A chunk is a passage from a document, not a duplicate of the entire file."
+        },
+        {
+          id: "document-embedding", phase: "prepare", number: 4, icon: "embed", short: "Embed documents",
+          title: "Create document embeddings",
+          detail: "The local embedding model converts every chunk into a numeric vector. Passages with similar meaning end up close together even when their wording differs.",
+          input: "One readable text chunk",
+          output: "A high-dimensional numeric vector",
+          idea: "Embeddings are numbers used for comparison. They are not summaries, encrypted text, or human-readable knowledge."
+        },
+        {
+          id: "vector-database", phase: "prepare", number: 5, icon: "database", short: "Vector DB",
+          title: "Store the searchable local index",
+          detail: "LanceDB stores each passage beside its embedding, keywords, and citation metadata. This derived index connects every numeric vector back to readable evidence.",
+          input: "Chunks, vectors, keywords, and source metadata",
+          output: "A local searchable index",
+          idea: "Retrieve searches this index. The database does not replace the original documents."
+        },
+        {
+          id: "user-prompt", phase: "answer", number: 1, icon: "question", short: "Question",
+          title: "Understand the user question",
+          detail: "The app preserves the user request and identifies its likely scope. It also turns the prompt into tokens, the small text pieces that language models process.",
+          input: "The user prompt and relevant recent conversation",
+          output: "Prompt tokens, query intent, and source scope",
+          idea: "Tokens are model-readable pieces of text. They are not the same as words, and their boundaries vary by model."
+        },
+        {
+          id: "query-embedding", phase: "answer", number: 2, icon: "query", short: "Embed query",
+          title: "Embed the question",
+          detail: "The same qwen3-embedding:4b model converts the search question into a vector compatible with the stored document vectors.",
+          input: "The retrieval question",
+          output: "A query vector in the same meaning space as document chunks",
+          idea: "Documents and questions must use the same embedding model. Changing it requires rebuilding the derived index."
+        },
+        {
+          id: "hybrid-search", phase: "answer", number: 3, icon: "search", short: "Retrieve",
+          title: "Search by meaning and keywords",
+          detail: "Hybrid retrieval combines semantic similarity with exact-term matching. It is useful when a question mixes concepts with filenames, products, acronyms, or numbers.",
+          input: "Question text, query vector, source scope, and the local index",
+          output: "Candidate passages ranked for relevance",
+          idea: "Retrieval finds possible evidence. It does not generate the answer or prove that a passage is factually correct."
+        },
+        {
+          id: "reranker", phase: "answer", number: 4, icon: "rerank", short: "Rerank",
+          title: "Rerank the candidate passages",
+          detail: "BAAI/bge-reranker-v2-m3 reads the question together with every candidate and moves the passages that answer it most directly toward the top.",
+          input: "The question plus retrieved candidate passages",
+          output: "A more focused passage order with reranker scores",
+          idea: "The reranker is enabled in this walkthrough. It is a quality pass after retrieval, not another database search."
+        },
+        {
+          id: "grounded-context", phase: "answer", number: 5, icon: "evidence", short: "Prepare evidence",
+          title: "Prepare grounded evidence",
+          detail: "The strongest passages are selected within the model context budget. Sensitive fields can be redacted, and each passage receives a source label such as [1].",
+          input: "Reranked passages and their source metadata",
+          output: "Grounded evidence labeled [1], [2], and so on",
+          idea: "This step prepares facts and citations. It does not create the separate answer rules."
+        },
+        {
+          id: "output-tokens", phase: "answer", number: 6, icon: "generate", short: "Generate",
+          title: "Generate output tokens",
+          detail: "The local chat model receives answer rules, user context, and grounded evidence in one request. It predicts and streams the answer one token at a time.",
+          input: "Answer rules + user context + grounded evidence",
+          output: "A streamed draft answer with citation markers",
+          idea: "Rules say how to answer. Grounded evidence supplies the facts. Neither becomes a special type of output token."
+        },
+        {
+          id: "verify-citations", phase: "answer", number: 7, icon: "verify", short: "Verify",
+          title: "Check sources and deliver",
+          detail: "The draft is checked against the evidence map. Invalid citation numbers are removed, exact values are preserved, and unsupported claims can be replaced with safer wording.",
+          input: "The streamed draft, grounded evidence, and citation map",
+          output: "The final answer with clickable source citations",
+          idea: "A fluent answer is not proof. Verification connects claims back to retrieved evidence."
+        }
+      ];
+
+      var relations = [
+        {
+          id: "embedding-space", kind: "Shared capability",
+          from: "Embed documents", to: "Embed query",
+          label: "Same model and vector space",
+          description: "The document chunks and question use qwen3-embedding:4b so their meanings can be compared.",
+          stageIds: ["document-embedding", "query-embedding"]
+        },
+        {
+          id: "search-index", kind: "Data flow",
+          from: "Vector DB", to: "Retrieve",
+          label: "Stored searchable index",
+          description: "Retrieve searches the chunks, vectors, keywords, and source metadata prepared in Journey 1.",
+          stageIds: ["vector-database", "hybrid-search"]
+        },
+        {
+          id: "source-provenance", kind: "Citation provenance",
+          from: "Read + Chunk", to: "Prepare evidence → Verify",
+          label: "Source locations travel with passages",
+          description: "Page, slide, sheet, cell, heading, and line locations remain attached until they become citations.",
+          stageIds: ["extract", "chunk", "grounded-context", "verify-citations"]
+        }
+      ];
+
+      var selectedId = "local-folder";
+      var relationFocus = null;
+      var streamTimer = null;
+      var pageParams = new URLSearchParams(window.location.search);
+      var embedded = pageParams.get("embedded") === "true";
+
+      if (embedded) document.documentElement.setAttribute("data-embedded", "true");
+
+      var embeddingModel = pageParams.get("embeddingModel");
+      var rerankerModel = pageParams.get("rerankerModel");
+      var rerankerEnabled = pageParams.get("rerankerEnabled");
+      if (embeddingModel) document.getElementById("embeddingModelValue").textContent = embeddingModel;
+      if (rerankerModel) document.getElementById("rerankerModelText").textContent = rerankerModel;
+      if (rerankerEnabled === "false") {
+        document.getElementById("rerankerModelValue").classList.remove("on-badge");
+        document.getElementById("rerankerModelValue").textContent = "Off in current settings";
+        document.getElementById("answerStageCount").textContent = "7 processes · reranker off";
       }
 
-      for (const stage of stages) {
-        const button = document.createElement('button')
-        button.className = 'stage'
-        button.type = 'button'
-        button.dataset.stage = stage.id
-        button.setAttribute('aria-pressed', 'false')
-        button.setAttribute('aria-label', `Open ${stage.title}`)
-        button.innerHTML = `<span class="stage-number">${stage.number}</span><span class="stage-title">${stage.short}</span>`
-        button.addEventListener('click', () => selectStage(stage.id))
-        document
-          .querySelector(stage.phase === 'prepare' ? '#prepare-stages' : '#answer-stages')
-          .appendChild(button)
+      function stageById(id) {
+        return stages.find(function (stage) { return stage.id === id; });
       }
-      selectStage('output-tokens')
-    </script>
-  </body>
+
+      function relationForStage(id) {
+        return relations.filter(function (relation) { return relation.stageIds.indexOf(id) !== -1; });
+      }
+
+      function relatedIds(id) {
+        var values = [];
+        relationForStage(id).forEach(function (relation) {
+          relation.stageIds.forEach(function (stageId) {
+            if (stageId !== id && values.indexOf(stageId) === -1) values.push(stageId);
+          });
+        });
+        return values;
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, function (character) {
+          return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"}[character];
+        });
+      }
+
+      function renderPipelines() {
+        var related = relatedIds(selectedId);
+        ["prepare", "answer"].forEach(function (phase) {
+          var target = document.getElementById(phase === "prepare" ? "preparePipeline" : "answerPipeline");
+          target.innerHTML = stages.filter(function (stage) { return stage.phase === phase; }).map(function (stage) {
+            var classes = "stage";
+            if (stage.id === selectedId) classes += " selected";
+            else if (related.indexOf(stage.id) !== -1) classes += " related";
+            var rerankerState = stage.id === "reranker"
+              ? '<span class="stage-reranker">' + (rerankerEnabled === "false" ? "OFF" : '<span class="on-dot"></span>ON') + '</span>'
+              : "";
+            return '<button class="' + classes + '" type="button" data-stage="' + stage.id + '" aria-pressed="' + (stage.id === selectedId) + '">' +
+              '<span class="stage-number">' + stage.number + '</span>' + rerankerState +
+              '<span class="stage-icon" aria-hidden="true">' + icons[stage.icon] + '</span>' +
+              '<span class="stage-name">' + escapeHtml(stage.short) + '</span>' +
+              '</button>';
+          }).join("");
+        });
+        document.querySelectorAll("[data-stage]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            selectStage(button.getAttribute("data-stage"), true);
+          });
+        });
+      }
+
+      function renderConnections() {
+        var activeIds = relationForStage(selectedId).map(function (relation) { return relation.id; });
+        document.getElementById("connectionGrid").innerHTML = relations.map(function (relation) {
+          var active = activeIds.indexOf(relation.id) !== -1 || relationFocus === relation.id;
+          return '<button class="connection' + (active ? " active" : "") + '" type="button" data-relation="' + relation.id + '" aria-pressed="' + active + '">' +
+            '<span class="connection-kind">' + escapeHtml(relation.kind) + '</span>' +
+            '<span class="connection-path"><span class="endpoint">' + escapeHtml(relation.from) + '</span><span class="connector-line"></span><span class="endpoint">' + escapeHtml(relation.to) + '</span></span>' +
+            '<strong>' + escapeHtml(relation.label) + '</strong><p>' + escapeHtml(relation.description) + '</p></button>';
+        }).join("");
+        bindConnectionInteractions();
+      }
+
+      function bindConnectionInteractions() {
+        document.querySelectorAll("[data-relation]").forEach(function (button) {
+          button.addEventListener("click", function () {
+            var id = button.getAttribute("data-relation");
+            var relation = relations.find(function (candidate) { return candidate.id === id; });
+            relationFocus = id;
+            selectStage(relation.stageIds[0], true);
+          });
+        });
+      }
+
+      function renderInspector() {
+        var stage = stageById(selectedId);
+        var index = stages.findIndex(function (candidate) { return candidate.id === selectedId; });
+        var stageRelations = relationForStage(selectedId);
+        var relationHtml = "";
+        if (stageRelations.length) {
+          relationHtml = '<div class="relation-note"><strong>Connected across the journeys</strong>' +
+            stageRelations.map(function (relation) { return escapeHtml(relation.from + " → " + relation.to + ": " + relation.label); }).join("<br>") +
+            '</div>';
+        }
+        document.getElementById("stageCopy").innerHTML =
+          '<div class="stage-heading"><span class="large-icon" aria-hidden="true">' + icons[stage.icon] + '</span><div>' +
+          '<p class="step-kicker">' + (stage.phase === "prepare" ? "Journey 1" : "Journey 2") + ' · Step ' + stage.number + ' · ' + escapeHtml(stage.short) + '</p>' +
+          '<h2>' + escapeHtml(stage.title) + '</h2></div></div>' +
+          '<p class="stage-detail">' + escapeHtml(stage.detail) + '</p>' +
+          '<div class="io-flow"><div class="io-card"><span>Goes in</span><strong>' + escapeHtml(stage.input) + '</strong></div>' +
+          '<div class="io-card"><span>Comes out</span><strong>' + escapeHtml(stage.output) + '</strong></div></div>' +
+          '<div class="key-idea"><strong>Why it matters</strong>' + escapeHtml(stage.idea) + '</div>' + relationHtml;
+
+        document.getElementById("stageExample").innerHTML =
+          '<div class="example-header"><span class="example-title">Illustrative data</span><span class="illustrative">Representative</span></div>' +
+          '<div class="process-demo-heading"><span>Inside this process</span><span>' + escapeHtml(stage.short) + '</span></div>' +
+          exampleFor(stage.id);
+        document.getElementById("progressFill").style.width = (((index + 1) / stages.length) * 100) + "%";
+        document.getElementById("progressLabel").textContent = (index + 1) + " / " + stages.length;
+        document.getElementById("previousButton").disabled = index === 0;
+        document.getElementById("nextButton").disabled = index === stages.length - 1;
+        bindExampleInteractions(stage.id);
+      }
+
+      function exampleFor(id) {
+        if (id === "local-folder") {
+          var files = [
+            ["Security_Guide.pdf", "42 pages", "PDF", "Text, tables, and page locations will be indexed."],
+            ["Network_Design.docx", "18 sections", "DOCX", "Headings and access-model sections will be preserved."],
+            ["Bill_of_Materials.xlsx", "3 sheets", "XLSX", "Cells, tables, sheet names, and ranges will be retained."],
+            ["Deployment_Notes.md", "126 lines", "MD", "Headings and exact line locations will be retained."]
+          ];
+          return '<div class="file-list">' + files.map(function (file, index) {
+            return '<button class="file-row' + (index === 0 ? " active" : "") + '" type="button" data-file-preview="' + escapeHtml(file[3]) + '">' +
+              '<span class="file-glyph">▤</span><span class="file-name">' + escapeHtml(file[0]) + '</span><span class="file-meta">' + escapeHtml(file[1]) + '</span><span class="tag">' + file[2] + '</span></button>';
+          }).join("") + '</div><div class="preview-strip" id="filePreview">Text, tables, and page locations will be indexed.</div>' +
+            '<p class="fineprint"><strong>Important:</strong> the original folder remains unchanged. Only searchable derivatives are stored in the index.</p>';
+        }
+        if (id === "extract") {
+          return '<div class="two-col"><div class="source-card source-map"><span class="tag blue">Security_Guide.pdf</span><strong style="margin-top:12px">Source map</strong><p>Page 12</p><p>Heading: Access control</p><p>Paragraphs 3–5</p><p>Reader: local PDF parser</p></div>' +
+            '<div class="code-card"><span class="code-blue"># Access control</span>\nAdministrators must use role-based access. Production changes require an approved change record and a second reviewer.\n\n<span style="color:var(--muted)">[table preserved: Role | Permission | Scope]</span></div></div>' +
+            '<p class="fineprint">The readable content and its location travel together. OCR would fill the same structure for a scanned page.</p>';
+        }
+        if (id === "chunk") {
+          var chunks = [
+            ["Chunk 07", "Page 12", "Administrators must use role-based access…", ""],
+            ["Chunk 08", "Pages 12–13", "…approved change record and a second reviewer. Emergency access…", "100-token overlap keeps the idea connected"],
+            ["Chunk 09", "Page 13", "Emergency access expires after four hours…", ""]
+          ];
+          return '<div class="three-col">' + chunks.map(function (chunk, index) {
+            return '<button class="chunk-card' + (index === 1 ? " active" : "") + '" type="button" data-chunk="' + index + '"><span class="chunk-top"><strong>' + chunk[0] + '</strong><span>' + chunk[1] + '</span></span><p>' + chunk[2] + '</p>' + (chunk[3] ? '<div class="overlap">' + chunk[3] + '</div>' : "") + '</button>';
+          }).join("") + '</div><p class="fineprint" id="chunkNote">Chunk 08 carries the sentence across the page boundary while preserving both page locations.</p>';
+        }
+        if (id === "document-embedding") {
+          var values = [0.18, -0.22, 0.74, 0.05, -0.31, 0.61, 0.09, -0.14];
+          return '<div class="transform"><div class="demo-card"><p class="demo-label">Chunk text</p><strong>“Production changes require an approved change record.”</strong></div><span class="transform-arrow" aria-hidden="true"></span><div class="demo-card"><p class="demo-label">qwen3-embedding:4b</p><strong>Meaning represented as numbers</strong></div></div>' +
+            '<div class="vector-grid">' + values.map(function (value) { return '<span class="vector-cell">' + (value > 0 ? "+" : "") + value.toFixed(2) + '</span>'; }).join("") + '</div>' +
+            '<p class="fineprint">This vector is shortened for teaching. A real embedding contains many more dimensions; individual decimals do not have human-readable labels.</p>';
+        }
+        if (id === "vector-database") {
+          var rows = [
+            ["c-008", "Security_Guide.pdf", "Page 12", "Production changes require…", "[+.18, −.22, …]", "Full record: chunk 008 · heading Access control · 238 tokens · checksum 7ae4…"],
+            ["c-021", "Network_Design.docx", "Access model", "Reviewers validate the…", "[+.11, −.29, …]", "Full record: chunk 021 · section Access model · 191 tokens · checksum 18c2…"],
+            ["c-034", "Bill_of_Materials.xlsx", "BOM A2:F18", "Part | Qty | Price…", "[−.04, +.52, …]", "Full record: chunk 034 · sheet BOM · cells A2:F18 · 167 tokens · checksum 941f…"]
+          ];
+          return '<div class="db-table"><div class="db-head"><span>ID</span><span>Source</span><span>Location</span><span>Passage</span><span>Vector</span></div>' +
+            rows.map(function (row) { return '<button class="db-row" type="button" data-record="' + escapeHtml(row[5]) + '"><span class="mono">' + row[0] + '</span><span>' + row[1] + '</span><span>' + row[2] + '</span><span>' + row[3] + '</span><span class="mono">' + row[4] + '</span></button>'; }).join("") +
+            '</div><div class="preview-strip" id="recordPreview">Select a row to inspect its representative metadata.</div><p class="fineprint"><span class="tag green">Stored locally</span> <span class="tag">Searchable derivatives</span> <span class="tag">Linked to originals</span></p>';
+        }
+        if (id === "user-prompt") {
+          var tokens = ["What", " approval", " is", " required", " before", " a", " production", " change", "?"];
+          return '<div class="prompt">What approval is required before a production change?</div><p class="demo-label" style="margin-top:15px">One possible token view</p>' +
+            '<div class="tokens">' + tokens.map(function (token) { return '<span class="token">' + escapeHtml(token) + '</span>'; }).join("") + '</div>' +
+            '<p class="fineprint"><span class="tag blue">Intent · direct question</span> <span class="tag">Topic · change approval</span></p>' +
+            '<p class="fineprint">Leading spaces can be part of a token. Actual boundaries depend on the tokenizer used by the selected chat model.</p>';
+        }
+        if (id === "query-embedding") {
+          return '<div class="transform"><div class="demo-card"><p class="demo-label">Question</p><strong>What approval is required before a production change?</strong></div><span class="transform-arrow" aria-hidden="true"></span><div class="demo-card mono">[+0.21, −0.19, +0.68, +0.08, …]</div></div>' +
+            '<div class="demo-card" style="margin-top:12px"><p class="demo-label">Shared meaning space</p><div class="similarity-bars">' +
+            '<div class="bar-row"><span>Relevant passage</span><span class="bar"><i style="width:91%"></i></span><strong>near</strong></div>' +
+            '<div class="bar-row"><span>Related policy</span><span class="bar"><i style="width:68%"></i></span><strong>mid</strong></div>' +
+            '<div class="bar-row"><span>Unrelated passage</span><span class="bar"><i style="width:22%"></i></span><strong>far</strong></div></div></div>' +
+            '<p class="fineprint">“Near” means numerically similar in the embedding space. It does not yet mean verified or factually correct.</p>';
+        }
+        if (id === "hybrid-search") {
+          return '<div class="weight-panel"><div class="weight-box"><strong id="meaningWeight">Meaning · 50%</strong><span>Matches concepts and paraphrases</span></div><span class="weight-total">total 100%</span><div class="weight-box"><strong id="keywordWeight">Keywords · 50%</strong><span>Matches exact names, terms, and numbers</span></div></div>' +
+            '<input class="weight-slider" id="weightSlider" type="range" min="0" max="100" value="50" aria-label="Meaning versus keyword influence">' +
+            '<div class="result-list" id="retrievalResults"></div>' +
+            '<div class="score-note"><strong>What 50% means:</strong> half of the illustrative combined score comes from semantic similarity and half from exact-term matching. Move the slider to see the order change.<br><strong>What the decimals mean:</strong> they are relative relevance scores for this result list. Higher is a stronger match here; they are not probabilities or factual-confidence scores.</div>';
+        }
+        if (id === "reranker") {
+          return '<div class="rerank-grid"><div class="rank-column"><h3>Before · retrieval order</h3><div class="rank-item"><span>1 · Deployment notes</span><span class="mono">0.83</span></div><div class="rank-item"><span>2 · Security guide</span><span class="mono">0.78</span></div><div class="rank-item"><span>3 · Network design</span><span class="mono">0.71</span></div></div>' +
+            '<div class="rerank-center">' + icons.rerank + '</div>' +
+            '<div class="rank-column" id="rerankedColumn"><h3>After · read together</h3><div class="rank-item best"><span>1 · Security guide</span><span class="mono">0.96</span></div><div class="rank-item"><span>2 · Network design</span><span class="mono">0.81</span></div><div class="rank-item"><span>3 · Deployment notes</span><span class="mono">0.54</span></div></div></div>' +
+            '<div class="model-chip">' + (rerankerEnabled === "false" ? "OFF IN CURRENT SETTINGS" : "ON · " + escapeHtml(rerankerModel || "BAAI/bge-reranker-v2-m3")) + '</div><div style="margin-top:10px"><button class="secondary-button" id="replayRerank" type="button">Replay reranking</button></div>' +
+            '<div class="score-note"><strong>What the decimals mean:</strong> the reranker scores each question–passage pair from 0 to 1 for direct relevance. Higher means it appears to answer this question more directly relative to these candidates. It is a ranking signal, not a probability or proof of correctness.</div>';
+        }
+        if (id === "grounded-context") {
+          return '<div class="evidence-layout"><div class="code-card"><span class="code-blue">GROUNDED EVIDENCE</span>\n\n<span class="code-blue">[1]</span> File: Security_Guide.pdf\nLocation: Page 12\nContent: Production changes require an approved change record and a second reviewer.\n\n<span class="code-blue">[2]</span> File: Network_Design.docx\nSection: Access model\nContent: Reviewers validate production access.</div>' +
+            '<div class="check-list"><div class="check"><span class="check-mark">✓</span>Best evidence selected</div><div class="check"><span class="check-mark">✓</span>Locations preserved</div><div class="check"><span class="check-mark">✓</span>Secrets redacted</div><div class="check"><span class="check-mark">✓</span>Context budget respected</div></div></div>' +
+            '<p class="fineprint"><strong>Grounded evidence</strong> is an output from this process. <strong>Answer rules</strong> are created separately by the application and meet the evidence only in Generate.</p>';
+        }
+        if (id === "output-tokens") {
+          return '<div class="generation-inputs"><div class="generation-input"><strong>Answer rules</strong><span class="source">Created by the app</span><p>Use evidence, cite claims, preserve exact values, and avoid unsupported facts.</p></div>' +
+            '<div class="generation-input"><strong>User context</strong><span class="source">Output of Question</span><p>The current question plus any recent conversation needed to understand it.</p></div>' +
+            '<div class="generation-input"><strong>Grounded evidence</strong><span class="source">Output of Prepare evidence</span><p>Selected local passages labeled [1], [2], and so on, with source locations.</p></div></div>' +
+            '<div class="combine-arrow">Combined as one model input ↓</div><div class="stream-box"><div class="stream-head"><strong>LOCAL CHAT MODEL · STREAMING</strong><button class="small-button" id="replayStream" type="button">Replay tokens</button></div><div class="stream-text" id="streamText"></div></div>' +
+            '<p class="fineprint">The three inputs influence every next-token choice; they do not become separate output token types. Citation marker [1] points back to grounded evidence [1].</p>';
+        }
+        if (id === "verify-citations") {
+          return '<div class="two-col"><div class="check-list"><div class="check"><span class="check-mark">✓</span>Citation [1] exists</div><div class="check"><span class="check-mark">✓</span>Claim matches passage</div><div class="check"><span class="check-mark">✓</span>Numbers copied exactly</div><div class="check"><span class="check-mark">✓</span>Sensitive values absent</div></div>' +
+            '<div class="demo-card"><p class="demo-label">Verified answer</p><p>A production change requires an approved change record and a second reviewer <strong class="mono">[1]</strong>.</p><button class="source-row" id="sourceButton" type="button"><span class="mono">[1]</span><strong>Security_Guide.pdf</strong><span>Page 12 ▾</span></button><div class="source-preview" id="sourcePreview"><strong>Access control · Page 12</strong><br>“Production changes require an approved change record and a second reviewer.”</div></div></div>' +
+            '<p class="fineprint">Citation search follows the marker to the evidence record, then back to the original file location.</p>';
+        }
+        return "";
+      }
+
+      function bindExampleInteractions(id) {
+        if (id === "local-folder") {
+          document.querySelectorAll("[data-file-preview]").forEach(function (row) {
+            row.addEventListener("click", function () {
+              document.querySelectorAll("[data-file-preview]").forEach(function (candidate) { candidate.classList.remove("active"); });
+              row.classList.add("active");
+              document.getElementById("filePreview").textContent = row.getAttribute("data-file-preview");
+            });
+          });
+        }
+        if (id === "chunk") {
+          var notes = [
+            "Chunk 07 contains the opening of the access-control section.",
+            "Chunk 08 carries the sentence across the page boundary while preserving both page locations.",
+            "Chunk 09 continues with the emergency-access rule."
+          ];
+          document.querySelectorAll("[data-chunk]").forEach(function (card) {
+            card.addEventListener("click", function () {
+              document.querySelectorAll("[data-chunk]").forEach(function (candidate) { candidate.classList.remove("active"); });
+              card.classList.add("active");
+              document.getElementById("chunkNote").textContent = notes[Number(card.getAttribute("data-chunk"))];
+            });
+          });
+        }
+        if (id === "vector-database") {
+          document.querySelectorAll("[data-record]").forEach(function (row) {
+            row.addEventListener("click", function () {
+              document.getElementById("recordPreview").textContent = row.getAttribute("data-record");
+            });
+          });
+        }
+        if (id === "hybrid-search") {
+          var slider = document.getElementById("weightSlider");
+          slider.addEventListener("input", renderRetrievalResults);
+          renderRetrievalResults();
+        }
+        if (id === "reranker") {
+          document.getElementById("replayRerank").addEventListener("click", function () {
+            document.querySelectorAll("#rerankedColumn .rank-item").forEach(function (row, index) {
+              row.classList.remove("flash");
+              window.setTimeout(function () { row.classList.add("flash"); }, 100 + (index * 140));
+            });
+          });
+        }
+        if (id === "output-tokens") {
+          document.getElementById("replayStream").addEventListener("click", playTokenStream);
+          playTokenStream();
+        }
+        if (id === "verify-citations") {
+          document.getElementById("sourceButton").addEventListener("click", function () {
+            document.getElementById("sourcePreview").classList.toggle("visible");
+          });
+        }
+      }
+
+      function renderRetrievalResults() {
+        var slider = document.getElementById("weightSlider");
+        if (!slider) return;
+        var meaning = Number(slider.value);
+        var keyword = 100 - meaning;
+        document.getElementById("meaningWeight").textContent = "Meaning · " + meaning + "%";
+        document.getElementById("keywordWeight").textContent = "Keywords · " + keyword + "%";
+        var candidates = [
+          {name: "Security_Guide.pdf · Page 12", text: "Production changes require an approved change record…", semantic: .84, keyword: .98},
+          {name: "Network_Design.docx · Access model", text: "A second reviewer validates production access…", semantic: .86, keyword: .70},
+          {name: "Deployment_Notes.md · Lines 44–51", text: "The production window begins after approval…", semantic: .72, keyword: .54}
+        ];
+        candidates.forEach(function (candidate) {
+          candidate.score = ((meaning / 100) * candidate.semantic) + ((keyword / 100) * candidate.keyword);
+        });
+        candidates.sort(function (a, b) { return b.score - a.score; });
+        document.getElementById("retrievalResults").innerHTML = candidates.map(function (candidate, index) {
+          return '<div class="result"><span class="rank">' + (index + 1) + '</span><span><strong>' + escapeHtml(candidate.name) + '</strong><span>' + escapeHtml(candidate.text) + '</span></span><strong class="result-score">' + candidate.score.toFixed(2) + '</strong></div>';
+        }).join("");
+      }
+
+      function playTokenStream() {
+        if (streamTimer) window.clearInterval(streamTimer);
+        var target = document.getElementById("streamText");
+        if (!target) return;
+        var tokens = ["Production", " changes", " require", " an", " approved", " change", " record", " and", " a", " second", " reviewer", " [1]."];
+        var current = [];
+        target.innerHTML = '<span class="cursor"></span>';
+        var index = 0;
+        streamTimer = window.setInterval(function () {
+          current.push('<span class="stream-token">' + escapeHtml(tokens[index]) + '</span>');
+          index += 1;
+          target.innerHTML = current.join("") + (index < tokens.length ? '<span class="cursor"></span>' : "");
+          if (index >= tokens.length) {
+            window.clearInterval(streamTimer);
+            streamTimer = null;
+          }
+        }, 155);
+      }
+
+      function selectStage(id, scroll) {
+        if (streamTimer) {
+          window.clearInterval(streamTimer);
+          streamTimer = null;
+        }
+        selectedId = id;
+        if (!relationForStage(id).some(function (relation) { return relation.id === relationFocus; })) relationFocus = null;
+        renderPipelines();
+        renderInspector();
+        renderConnections();
+        if (scroll) document.getElementById("inspector").scrollIntoView({behavior: "smooth", block: "start"});
+      }
+
+      function moveStage(direction) {
+        var index = stages.findIndex(function (stage) { return stage.id === selectedId; });
+        var nextIndex = Math.max(0, Math.min(stages.length - 1, index + direction));
+        if (nextIndex !== index) selectStage(stages[nextIndex].id, true);
+      }
+
+      function setTheme(theme) {
+        document.documentElement.setAttribute("data-theme", theme);
+        try { localStorage.setItem("rag-explainer-theme", theme); } catch (error) {}
+        var button = document.getElementById("themeButton");
+        var dark = theme === "dark";
+        button.innerHTML = dark ? icons.sun : icons.moon;
+        button.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
+        button.title = dark ? "Switch to light mode" : "Switch to dark mode";
+      }
+
+      function initializeTheme() {
+        var saved = null;
+        try { saved = localStorage.getItem("rag-explainer-theme"); } catch (error) {}
+        var preferred = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        setTheme(saved === "dark" || saved === "light" ? saved : preferred);
+      }
+
+      document.getElementById("themeButton").addEventListener("click", function () {
+        setTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
+      });
+      document.getElementById("appBackButton").addEventListener("click", function () {
+        if (embedded && window.parent !== window) {
+          window.parent.postMessage({type: "ravndock:rag-explainer-back"}, "*");
+        }
+      });
+      document.getElementById("presentButton").addEventListener("click", function () {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+        else if (document.exitFullscreen) document.exitFullscreen();
+      });
+      document.getElementById("tourButton").addEventListener("click", function () {
+        relationFocus = null;
+        selectStage(stages[0].id, true);
+        document.querySelector(".tour-full").textContent = "Tour started · use Next";
+        document.querySelector(".tour-mobile").textContent = "Started";
+      });
+      document.getElementById("previousButton").addEventListener("click", function () { moveStage(-1); });
+      document.getElementById("nextButton").addEventListener("click", function () { moveStage(1); });
+      document.addEventListener("keydown", function (event) {
+        var tag = document.activeElement && document.activeElement.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+        if (event.key === "ArrowLeft") moveStage(-1);
+        if (event.key === "ArrowRight") moveStage(1);
+      });
+
+      initializeTheme();
+      renderPipelines();
+      renderInspector();
+      renderConnections();
+    }());
+  </script>
+</body>
 </html>
