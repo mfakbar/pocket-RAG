@@ -1,0 +1,29 @@
+node_modules
+dist
+out
+.test-out
+.DS_Store
+.eslintcache
+*.log*
+rag-backend/.venv/
+rag-backend/.benchmark/
+rag-backend/.pytest_cache/
+rag-backend/**/__pycache__/
+*.p12
+*.provisionprofile
+app-store/private/
+release.env
+release.env.*
+.continue/
+Knowledge Base/
+design-preview/
+tmp_*.mjs
+
+# Local evaluation inputs and generated reports can contain source-derived data.
+rag-backend/benchmark/*report*.json
+rag-backend/benchmark/*report*.md
+rag-backend/benchmark/*release-gate*.json
+rag-backend/benchmark/kb_quality_questions*.json
+rag-backend/benchmark/qc_2b_4b_prompts.json
+rag-backend/benchmark/excel_boq_prompts.json
+rag-backend/benchmark/questions.json

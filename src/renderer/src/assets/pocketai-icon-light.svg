@@ -1,0 +1,32 @@
+<svg viewBox="0 0 1024 1024" width="1024" height="1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="i2-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F2F2F7" />
+      <stop offset="100%" stop-color="#E5E5EA" />
+    </linearGradient>
+    <linearGradient id="i2-dock" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(0,0,0,0.18)" />
+      <stop offset="100%" stop-color="rgba(0,0,0,0.08)" />
+    </linearGradient>
+    <filter id="i2-shadow-1" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="20" stdDeviation="20" flood-color="#000" flood-opacity="0.2" />
+    </filter>
+    <filter id="i2-shadow-2" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="-5" stdDeviation="10" flood-color="#000" flood-opacity="0.1" />
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="256" fill="url(#i2-bg)" />
+  <rect x="2" y="2" width="1020" height="1020" rx="254" stroke="rgba(0,0,0,0.05)" stroke-width="4" />
+  <g filter="url(#i2-shadow-1)">
+    <path d="M 280 430 C 220 450 150 490 150 490 C 140 495 140 505 150 505 C 190 505 250 520 280 540 Z" fill="#48484A" />
+    <rect x="252" y="240" width="520" height="420" rx="210" fill="#48484A" />
+    <circle cx="412" cy="420" r="45" fill="#FFFFFF" />
+    <circle cx="612" cy="420" r="45" fill="#FFFFFF" />
+  </g>
+  <g filter="url(#i2-shadow-2)">
+    <rect x="162" y="600" width="700" height="260" rx="130" fill="url(#i2-dock)" />
+    <rect x="162" y="600" width="700" height="260" rx="130" stroke="rgba(0,0,0,0.1)" stroke-width="4" />
+    <rect x="222" y="600" width="580" height="60" rx="30" fill="#000000" opacity="0.1" />
+    <rect x="232" y="610" width="560" height="40" rx="20" fill="#000000" opacity="0.15" />
+  </g>
+</svg>

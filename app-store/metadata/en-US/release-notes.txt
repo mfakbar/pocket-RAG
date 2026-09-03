@@ -1,0 +1,8 @@
+RavenDock 1.1.0
+
+Private document chat on your Mac with local knowledge bases, source citations,
+model choices, and resource monitoring.
+
+Requirements: Apple Silicon Mac with at least 16 GB memory. This release is
+independently distributed as an unsigned DMG; macOS may ask you to approve the
+first launch in System Settings → Privacy & Security → Open Anyway.

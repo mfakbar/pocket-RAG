@@ -1,0 +1,9 @@
+RavenDock turns a folder on your Mac into a private AI knowledge base.
+
+Choose a local folder, select a model, and ask questions in plain language. RavenDock searches your synchronized documents and shows the file locations supporting each answer, including PDF pages, PowerPoint slides, spreadsheet cells, document sections, CSV rows, and text lines.
+
+Your prompts and document contents are processed locally. They are not intentionally uploaded to the developer, analytics providers, or advertising services. Internet access is used only for downloads you approve, such as local AI model files.
+
+RavenDock supports PDF, Word, PowerPoint, Excel, CSV, text, and Markdown files. Manual synchronization processes only new and changed documents while leaving your original files untouched.
+
+Monitor model speed and Mac resource usage, choose between simple model profiles or installed custom models, and fine-tune retrieval settings when needed.

@@ -1,0 +1,7 @@
+RavenDock does not require an account or login. It processes prompts and selected documents locally.
+
+DO NOT SUBMIT THIS DRAFT. It is valid only after the App Store runtime blocker in docs/APP_STORE_RELEASE.md is resolved.
+
+After that work is complete, use a sanitized demo knowledge folder, document the clean-machine test steps, and provide a reviewer contact. The submitted build must bundle and sign every runtime executable. It must not download executable code at first run.
+
+Do not submit while the bundled-runtime preflight blocker remains.

@@ -1,0 +1,14 @@
+@import 'tailwindcss';
+@import './styles/fonts.css';
+@import './styles/theme.css';
+
+/* Explicit draggable title area for macOS */
+.drag-region {
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+/* Interactive controls inside draggable area */
+.no-drag {
+  -webkit-app-region: no-drag;
+}

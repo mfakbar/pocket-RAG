@@ -1,0 +1,60 @@
+appId: com.pocketai.app
+productName: RavnDock
+directories:
+  buildResources: build
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!{.continue,docs,app-store,scripts}/**'
+  - '!{Knowledge Base,design-preview}/**'
+  - '!rag-backend/**'
+  - '!{text.txt,MEMORY.md}'
+asarUnpack:
+  - resources/**
+extraResources:
+  - from: rag-backend
+    to: rag-backend
+    filter:
+      - pyproject.toml
+      - uv.lock
+      - src/**
+      - '!src/**/__pycache__/**'
+      - '!src/**/*.pyc'
+  - from: build/PrivacyInfo.xcprivacy
+    to: PrivacyInfo.xcprivacy
+mac:
+  category: public.app-category.productivity
+  icon: build/icon.icns
+  minimumSystemVersion: '12.0'
+  target:
+    - target: dmg
+      arch:
+        - arm64
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
+  extendInfo:
+    NSDocumentsFolderUsageDescription: RavnDock reads only the folder you choose for your private knowledge base.
+    NSDownloadsFolderUsageDescription: RavnDock reads Downloads only when you choose it as your knowledge folder.
+    ITSAppUsesNonExemptEncryption: false
+    NSHumanReadableCopyright: Copyright 2026 Muhammad F. Akbar
+  # Release commands enable notarization and force signing. Development builds stay local.
+  notarize: false
+mas:
+  category: public.app-category.productivity
+  entitlements: build/entitlements.mas.plist
+  entitlementsInherit: build/entitlements.mas.inherit.plist
+  provisioningProfile: build/RavenDock.provisionprofile
+  artifactName: RavnDock-${version}-mas.${ext}
+masDev:
+  category: public.app-category.productivity
+  entitlements: build/entitlements.mas.plist
+  entitlementsInherit: build/entitlements.mas.inherit.plist
+  provisioningProfile: build/RavenDock-Development.provisionprofile
+dmg:
+  icon: build/icon.icns
+  artifactName: RavnDock-${version}-${arch}.${ext}
+npmRebuild: false
