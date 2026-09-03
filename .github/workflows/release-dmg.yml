@@ -38,7 +38,7 @@ jobs:
       - name: Create checksum
         run: shasum -a 256 dist/RavnDock-*.dmg > dist/RavnDock-${{ inputs.tag }}.sha256
       - name: Upload release artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: RavnDock-${{ inputs.tag }}-macOS-arm64
           path: |
