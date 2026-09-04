@@ -38,6 +38,18 @@ indexing through retrieval, output-token generation, and citation checks.
 The preview uses illustrative content; it does not expose customer documents or live
 application data.
 
+## Resource monitoring
+
+RavnDock shows Mac-wide CPU, memory, and GPU activity alongside its own resource use.
+It also tracks completed local chats so you can compare model startup time, generation
+speed, per-token latency, and end-to-end response time.
+
+<img src="docs/images/resource-monitoring.png" alt="RavnDock resource monitor showing CPU, memory, GPU, and local model performance" width="960">
+
+The values shown are an example and vary by Mac, model, and workload. macOS does not
+expose RavnDock's per-process GPU percentage, so the app reports total GPU activity and
+loaded AI-model memory separately.
+
 ## Details
 
 ### How it works

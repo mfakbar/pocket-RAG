@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppSettings } from '../../../shared/contracts'
 
 const BACK_MESSAGE = 'ravndock:rag-explainer-back'
@@ -11,6 +11,12 @@ export default function RagExplainerView({
   onBack: () => void
 }): React.JSX.Element {
   const frameRef = useRef<HTMLIFrameElement>(null)
+  const [theme, setTheme] = useState<'light' | 'dark'>(() =>
+    document.documentElement.dataset.theme === 'dark' ||
+    document.documentElement.classList.contains('dark')
+      ? 'dark'
+      : 'light'
+  )
   const explainerUrl = useMemo(() => {
     const url = new URL('rag-behind-the-scenes.html', window.location.href)
     url.searchParams.set('embedded', 'true')
@@ -19,6 +25,21 @@ export default function RagExplainerView({
     url.searchParams.set('rerankerEnabled', settings.rag.improveDocumentMatching ? 'true' : 'false')
     return url.toString()
   }, [settings.embeddingModel, settings.rerankerModel, settings.rag.improveDocumentMatching])
+
+  useEffect(() => {
+    const root = document.documentElement
+    const syncTheme = (): void => {
+      setTheme(root.dataset.theme === 'dark' || root.classList.contains('dark') ? 'dark' : 'light')
+    }
+    const observer = new MutationObserver(syncTheme)
+    observer.observe(root, { attributes: true, attributeFilter: ['class', 'data-theme'] })
+    syncTheme()
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    frameRef.current?.contentWindow?.postMessage({ type: 'ravndock:theme', theme }, '*')
+  }, [theme])
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent): void => {
@@ -36,7 +57,9 @@ export default function RagExplainerView({
       className="h-full w-full border-0 bg-background"
       src={explainerUrl}
       title="RAG Behind the Scenes"
-      allowFullScreen
+      onLoad={() =>
+        frameRef.current?.contentWindow?.postMessage({ type: 'ravndock:theme', theme }, '*')
+      }
     />
   )
 }

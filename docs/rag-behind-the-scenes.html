@@ -7,88 +7,91 @@
   <title>RAG Behind the Scenes</title>
   <style>
     :root {
-      --bg: #f4f7fb;
-      --surface: #ffffff;
-      --surface-2: #f8fafc;
-      --surface-3: #eef3f9;
-      --text: #172033;
-      --muted: #637083;
-      --border: #d9e1eb;
-      --border-strong: #c4cfdd;
-      --blue: #246fce;
-      --blue-strong: #155bb2;
-      --blue-soft: #e8f2ff;
-      --green: #238758;
-      --green-soft: #e6f6ee;
-      --purple: #7857d8;
-      --purple-soft: #f0ebff;
-      --amber: #ad6d0d;
-      --amber-soft: #fff4dc;
-      --danger: #bd3f50;
-      --shadow: 0 12px 34px rgba(27, 48, 78, 0.08);
-      --radius: 18px;
-      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-      --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --bg: #ffffff;
+      --surface: rgba(255, 255, 255, 0.94);
+      --surface-2: rgba(13, 13, 13, 0.045);
+      --surface-3: rgba(13, 13, 13, 0.07);
+      --text: #0d0d0d;
+      --muted: #5d5d5d;
+      --border: rgba(13, 13, 13, 0.14);
+      --border-strong: rgba(13, 13, 13, 0.22);
+      --blue: #0169cc;
+      --blue-strong: #0169cc;
+      --blue-soft: rgba(1, 105, 204, 0.09);
+      --green: #0f6b2c;
+      --green-soft: #edf7ef;
+      --purple: #751ed9;
+      --purple-soft: rgba(117, 30, 217, 0.08);
+      --amber: #9a6700;
+      --amber-soft: #fff7e6;
+      --danger: #b3261e;
+      --shadow: 0 1px 2px rgba(35, 35, 38, 0.08);
+      --radius: 12px;
+      --mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
     html[data-theme="dark"] {
-      --bg: #0c0f13;
-      --surface: #15191e;
-      --surface-2: #101419;
-      --surface-3: #1b2129;
-      --text: #f0f3f7;
-      --muted: #9aa5b4;
-      --border: #2c333d;
-      --border-strong: #3b4552;
-      --blue: #5aa6ff;
-      --blue-strong: #8bc0ff;
-      --blue-soft: #152a43;
-      --green: #68cc8d;
-      --green-soft: #142b20;
-      --purple: #a791ff;
-      --purple-soft: #241d40;
-      --amber: #efba61;
-      --amber-soft: #352814;
-      --danger: #ff8493;
-      --shadow: 0 18px 46px rgba(0, 0, 0, 0.26);
+      --bg: #111111;
+      --surface: rgba(29, 29, 29, 0.94);
+      --surface-2: rgba(252, 252, 252, 0.055);
+      --surface-3: rgba(252, 252, 252, 0.09);
+      --text: #fcfcfc;
+      --muted: #a8a8a8;
+      --border: rgba(252, 252, 252, 0.16);
+      --border-strong: rgba(252, 252, 252, 0.25);
+      --blue: #62adf5;
+      --blue-strong: #62adf5;
+      --blue-soft: rgba(1, 105, 204, 0.16);
+      --green: #78e294;
+      --green-soft: rgba(48, 209, 88, 0.12);
+      --purple: #b06dff;
+      --purple-soft: rgba(176, 109, 255, 0.12);
+      --amber: #ffd18a;
+      --amber-soft: rgba(255, 159, 10, 0.14);
+      --danger: #ffb4ab;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.24);
     }
 
     @media (prefers-color-scheme: dark) {
       html:not([data-theme]) {
-        --bg: #0c0f13;
-        --surface: #15191e;
-        --surface-2: #101419;
-        --surface-3: #1b2129;
-        --text: #f0f3f7;
-        --muted: #9aa5b4;
-        --border: #2c333d;
-        --border-strong: #3b4552;
-        --blue: #5aa6ff;
-        --blue-strong: #8bc0ff;
-        --blue-soft: #152a43;
-        --green: #68cc8d;
-        --green-soft: #142b20;
-        --purple: #a791ff;
-        --purple-soft: #241d40;
-        --amber: #efba61;
-        --amber-soft: #352814;
-        --danger: #ff8493;
-        --shadow: 0 18px 46px rgba(0, 0, 0, 0.26);
+        --bg: #111111;
+        --surface: rgba(29, 29, 29, 0.94);
+        --surface-2: rgba(252, 252, 252, 0.055);
+        --surface-3: rgba(252, 252, 252, 0.09);
+        --text: #fcfcfc;
+        --muted: #a8a8a8;
+        --border: rgba(252, 252, 252, 0.16);
+        --border-strong: rgba(252, 252, 252, 0.25);
+        --blue: #62adf5;
+        --blue-strong: #62adf5;
+        --blue-soft: rgba(1, 105, 204, 0.16);
+        --green: #78e294;
+        --green-soft: rgba(48, 209, 88, 0.12);
+        --purple: #b06dff;
+        --purple-soft: rgba(176, 109, 255, 0.12);
+        --amber: #ffd18a;
+        --amber-soft: rgba(255, 159, 10, 0.14);
+        --danger: #ffb4ab;
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.24);
       }
     }
 
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; font-size: 14px; }
     body {
       margin: 0;
       min-width: 320px;
-      background:
-        radial-gradient(circle at 10% -10%, color-mix(in srgb, var(--blue) 12%, transparent), transparent 31rem),
-        var(--bg);
+      background: var(--bg);
       color: var(--text);
       font-family: var(--sans);
-      line-height: 1.5;
+      font-size: 14px;
+      line-height: 1.45;
+      letter-spacing: 0;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
     }
+    html[data-theme="dark"] body { font-family: Geist, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     button, input { font: inherit; }
     button { color: inherit; }
     button:focus-visible, input:focus-visible {
@@ -105,8 +108,8 @@
       backdrop-filter: blur(18px);
     }
     .topbar-inner {
-      width: min(1280px, calc(100% - 32px));
-      min-height: 66px;
+      width: min(1024px, calc(100% - 32px));
+      min-height: 52px;
       margin: 0 auto;
       display: flex;
       align-items: center;
@@ -131,25 +134,11 @@
       background: var(--blue-soft);
     }
     .brand-mark svg { width: 19px; height: 19px; }
-    .topnav {
-      display: flex;
-      gap: 4px;
-      margin-left: auto;
-    }
-    .topnav a {
-      padding: 8px 10px;
-      border-radius: 9px;
-      color: var(--muted);
-      font-size: 13px;
-      text-decoration: none;
-    }
-    .topnav a:hover { color: var(--text); background: var(--surface-3); }
     .toolbar {
       display: flex;
       align-items: center;
       gap: 8px;
-      padding-left: 14px;
-      border-left: 1px solid var(--border);
+      margin-left: auto;
     }
     .tool-button, .primary-button, .secondary-button {
       min-height: 38px;
@@ -171,6 +160,7 @@
     .tool-button svg { width: 17px; height: 17px; }
     .app-back-button { display: none; }
     html[data-embedded="true"] .app-back-button { display: inline-flex; }
+    html[data-embedded="true"] .theme-button { display: none; }
     .primary-button {
       border: 1px solid var(--blue);
       padding: 0 14px;
@@ -190,9 +180,9 @@
     }
 
     .page {
-      width: min(1280px, calc(100% - 32px));
+      width: min(1024px, calc(100% - 32px));
       margin: 0 auto;
-      padding: 34px 0 64px;
+      padding: 20px 0 40px;
     }
     .hero, .journey, .connections, .inspector {
       border: 1px solid var(--border);
@@ -202,65 +192,65 @@
     }
     .hero {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 330px;
+      grid-template-columns: minmax(0, 1fr) 260px;
       align-items: center;
-      gap: 42px;
-      padding: 28px;
+      gap: 24px;
+      padding: 20px;
     }
     .eyebrow {
       display: flex;
       align-items: center;
       gap: 9px;
       color: var(--blue);
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 800;
       letter-spacing: .16em;
       text-transform: uppercase;
     }
     .eyebrow svg { width: 20px; height: 20px; }
     h1 {
-      max-width: 760px;
-      margin: 11px 0 9px;
-      font-size: clamp(28px, 4vw, 46px);
-      line-height: 1.08;
-      letter-spacing: -.035em;
+      max-width: 680px;
+      margin: 8px 0 7px;
+      font-size: clamp(20px, 2.5vw, 24px);
+      line-height: 1.2;
+      letter-spacing: -.02em;
     }
     .hero-copy {
       max-width: 770px;
       margin: 0;
       color: var(--muted);
-      font-size: 15px;
-      line-height: 1.7;
+      font-size: 12px;
+      line-height: 1.6;
     }
     .local-note {
       display: inline-flex;
       align-items: center;
       gap: 7px;
-      margin-top: 18px;
+      margin-top: 12px;
       padding: 7px 10px;
       border: 1px solid color-mix(in srgb, var(--green) 32%, var(--border));
       border-radius: 999px;
       background: var(--green-soft);
       color: var(--green);
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
     }
     .model-stack {
       display: grid;
-      gap: 10px;
-      padding: 16px;
+      gap: 8px;
+      padding: 12px;
       border: 1px solid var(--border);
       border-radius: 15px;
       background: var(--surface-2);
     }
     .model-row {
       display: grid;
-      grid-template-columns: 92px minmax(0, 1fr);
-      gap: 12px;
+      grid-template-columns: 78px minmax(0, 1fr);
+      gap: 10px;
       align-items: center;
       padding-bottom: 10px;
       border-bottom: 1px solid var(--border);
-      font-size: 12px;
+      font-size: 10px;
     }
     .model-row:last-child { padding: 0; border: 0; }
     .model-label { color: var(--muted); }
@@ -284,14 +274,14 @@
       box-shadow: 0 0 0 5px color-mix(in srgb, var(--green) 12%, transparent);
     }
 
-    .section-stack { display: grid; gap: 14px; margin-top: 16px; }
-    .journey { padding: 20px; }
+    .section-stack { display: grid; gap: 12px; margin-top: 12px; }
+    .journey { padding: 16px; }
     .section-heading {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 18px;
-      margin-bottom: 16px;
+      gap: 14px;
+      margin-bottom: 12px;
     }
     .section-title-group {
       display: flex;
@@ -302,20 +292,20 @@
     .journey-label {
       display: inline-flex;
       align-items: center;
-      padding: 6px 10px;
-      border-radius: 9px;
+      padding: 5px 8px;
+      border-radius: 8px;
       background: var(--blue-soft);
       color: var(--blue);
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 800;
       letter-spacing: .13em;
       text-transform: uppercase;
     }
-    .journey-description { color: var(--muted); font-size: 13px; }
+    .journey-description { color: var(--muted); font-size: 11px; }
     .stage-count {
       flex: none;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 10px;
     }
     .pipeline {
       position: relative;
@@ -336,15 +326,15 @@
     .stage {
       position: relative;
       min-width: 0;
-      min-height: 108px;
+      min-height: 88px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 9px;
-      padding: 12px 8px;
+      gap: 7px;
+      padding: 10px 7px;
       border: 1px solid var(--border);
-      border-radius: 15px;
+      border-radius: 12px;
       background: var(--surface);
       cursor: pointer;
       transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
@@ -366,8 +356,8 @@
     .stage-icon {
       position: relative;
       z-index: 1;
-      width: 44px;
-      height: 44px;
+      width: 36px;
+      height: 36px;
       display: grid;
       place-items: center;
       border: 1px solid var(--border-strong);
@@ -381,10 +371,10 @@
       color: white;
     }
     .stage.related .stage-icon { color: var(--purple); border-color: color-mix(in srgb, var(--purple) 45%, var(--border)); }
-    .stage-icon svg { width: 20px; height: 20px; stroke-width: 1.8; }
+    .stage-icon svg { width: 16px; height: 16px; stroke-width: 1.8; }
     .stage-name {
       min-width: 0;
-      font-size: 13px;
+      font-size: 11px;
       font-weight: 760;
       line-height: 1.25;
       text-align: center;
@@ -409,7 +399,7 @@
       letter-spacing: .08em;
     }
 
-    .connections { margin-top: 16px; padding: 20px; }
+    .connections { margin-top: 12px; padding: 16px; }
     .connection-intro {
       display: flex;
       align-items: flex-start;
@@ -507,7 +497,7 @@
     .connection p { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
 
     .inspector {
-      margin-top: 16px;
+      margin-top: 12px;
       overflow: hidden;
       scroll-margin-top: 82px;
     }
@@ -516,7 +506,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding: 15px 20px;
+      padding: 12px 16px;
       border-bottom: 1px solid var(--border);
       background: var(--surface-2);
     }
@@ -555,10 +545,10 @@
     .inspector-body {
       display: grid;
       grid-template-columns: minmax(270px, .72fr) minmax(0, 1.55fr);
-      min-height: 410px;
+      min-height: 360px;
     }
     .stage-copy {
-      padding: 26px;
+      padding: 20px;
       border-right: 1px solid var(--border);
     }
     .stage-heading {
@@ -567,8 +557,8 @@
       gap: 13px;
     }
     .stage-heading .large-icon {
-      width: 50px;
-      height: 50px;
+      width: 42px;
+      height: 42px;
       flex: none;
       display: grid;
       place-items: center;
@@ -576,21 +566,21 @@
       background: var(--blue);
       color: white;
     }
-    .large-icon svg { width: 24px; height: 24px; }
+    .large-icon svg { width: 20px; height: 20px; }
     .step-kicker {
       margin: 0;
       color: var(--blue);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 850;
       letter-spacing: .04em;
     }
     .stage-copy h2 {
       margin: 4px 0 0;
-      font-size: 21px;
+      font-size: 16px;
       line-height: 1.2;
       letter-spacing: -.02em;
     }
-    .stage-detail { margin: 19px 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+    .stage-detail { margin: 14px 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
     .io-flow {
       display: grid;
       grid-template-columns: 1fr;
@@ -632,7 +622,7 @@
     }
     .example {
       min-width: 0;
-      padding: 22px;
+      padding: 18px;
       background: var(--surface);
     }
     .example-header {
@@ -979,7 +969,6 @@
       .db-head span:last-child, .db-row span:last-child { display: none; }
     }
     @media (max-width: 860px) {
-      .topnav { display: none; }
       .hero { grid-template-columns: 1fr; }
       .model-stack { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .model-row { grid-template-columns: 1fr; gap: 2px; padding: 0 10px 0 0; border: 0; border-right: 1px solid var(--border); }
@@ -997,7 +986,6 @@
       .topbar-inner { min-height: 58px; }
       .brand > span:last-child { display: none; }
       .toolbar { margin-left: auto; gap: 6px; padding-left: 8px; }
-      #presentButton { display: none; }
       .tool-button { width: 44px; min-height: 44px; }
       .primary-button { min-height: 44px; padding: 0 14px; font-size: 12px; }
       .tour-full { display: none; }
@@ -1006,14 +994,14 @@
       .hero, .journey, .connections { padding: 16px; border-radius: 15px; }
       .hero { gap: 20px; }
       .eyebrow { font-size: 10px; }
-      .hero-copy { font-size: 13px; }
+      .hero-copy { font-size: 12px; }
       .model-stack { grid-template-columns: 1fr; padding: 13px; }
       .model-row { grid-template-columns: 90px 1fr; padding: 0 0 9px; border-right: 0; border-bottom: 1px solid var(--border); }
       .pipeline.prepare, .pipeline.answer { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
       .stage { min-height: 94px; gap: 6px; padding: 10px 6px; }
       .stage-icon { width: 38px; height: 38px; }
       .stage-icon svg { width: 18px; height: 18px; }
-      .stage-name { font-size: 12px; }
+      .stage-name { font-size: 11px; }
       .stage-number { top: 6px; left: 8px; }
       .stage-reranker { top: 6px; right: 6px; }
       .section-heading { align-items: flex-start; }
@@ -1077,19 +1065,11 @@
         </span>
         <span>RAG Behind the Scenes</span>
       </div>
-      <nav class="topnav" aria-label="Page sections">
-        <a href="#overview">Overview</a>
-        <a href="#journey-one">Prepare knowledge</a>
-        <a href="#journey-two">Answer a question</a>
-      </nav>
       <div class="toolbar">
         <button class="tool-button app-back-button" id="appBackButton" type="button" aria-label="Back to Advanced Settings" title="Back to Advanced Settings">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m15 18-6-6 6-6"/></svg>
         </button>
-        <button class="tool-button" id="themeButton" type="button" aria-label="Switch color theme" title="Switch color theme"></button>
-        <button class="tool-button" id="presentButton" type="button" aria-label="Enter presentation mode" title="Enter presentation mode">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-        </button>
+        <button class="tool-button theme-button" id="themeButton" type="button" aria-label="Switch color theme" title="Switch color theme"></button>
         <button class="primary-button" id="tourButton" type="button"><span class="tour-full">Start guided tour</span><span class="tour-mobile">Tour</span></button>
       </div>
     </div>
@@ -1129,7 +1109,7 @@
       <section class="journey" id="journey-one" aria-labelledby="journey-one-title">
         <div class="section-heading">
           <div class="section-title-group">
-            <span class="journey-label" id="journey-one-title">Journey 1 · Prepare knowledge</span>
+            <span class="journey-label" id="journey-one-title">Stage 1 · Prepare knowledge</span>
             <span class="journey-description">Runs when local files are indexed or updated</span>
           </div>
           <span class="stage-count">5 processes</span>
@@ -1140,7 +1120,7 @@
       <section class="journey" id="journey-two" aria-labelledby="journey-two-title">
         <div class="section-heading">
           <div class="section-title-group">
-            <span class="journey-label" id="journey-two-title">Journey 2 · Answer a question</span>
+            <span class="journey-label" id="journey-two-title">Stage 2 · Answer a question</span>
             <span class="journey-description">Uses the prepared index for every prompt</span>
           </div>
           <span class="stage-count" id="answerStageCount">7 processes · reranker on</span>
@@ -1169,7 +1149,7 @@
     <section class="connections" aria-labelledby="connections-title">
       <div class="connection-intro">
         <div>
-          <h2 id="connections-title">How Journey 1 powers Journey 2</h2>
+          <h2 id="connections-title">How Stage 1 powers Stage 2</h2>
           <p>Your files build a searchable local index. They do not retrain the chat model.</p>
         </div>
         <span class="hint">Select a connection to trace it</span>
@@ -1315,7 +1295,7 @@
           id: "search-index", kind: "Data flow",
           from: "Vector DB", to: "Retrieve",
           label: "Stored searchable index",
-          description: "Retrieve searches the chunks, vectors, keywords, and source metadata prepared in Journey 1.",
+          description: "Retrieve searches the chunks, vectors, keywords, and source metadata prepared in Stage 1.",
           stageIds: ["vector-database", "hybrid-search"]
         },
         {
@@ -1424,13 +1404,13 @@
         var stageRelations = relationForStage(selectedId);
         var relationHtml = "";
         if (stageRelations.length) {
-          relationHtml = '<div class="relation-note"><strong>Connected across the journeys</strong>' +
+          relationHtml = '<div class="relation-note"><strong>Connected across the stages</strong>' +
             stageRelations.map(function (relation) { return escapeHtml(relation.from + " → " + relation.to + ": " + relation.label); }).join("<br>") +
             '</div>';
         }
         document.getElementById("stageCopy").innerHTML =
           '<div class="stage-heading"><span class="large-icon" aria-hidden="true">' + icons[stage.icon] + '</span><div>' +
-          '<p class="step-kicker">' + (stage.phase === "prepare" ? "Journey 1" : "Journey 2") + ' · Step ' + stage.number + ' · ' + escapeHtml(stage.short) + '</p>' +
+          '<p class="step-kicker">' + (stage.phase === "prepare" ? "Stage 1" : "Stage 2") + ' · Step ' + stage.number + ' · ' + escapeHtml(stage.short) + '</p>' +
           '<h2>' + escapeHtml(stage.title) + '</h2></div></div>' +
           '<p class="stage-detail">' + escapeHtml(stage.detail) + '</p>' +
           '<div class="io-flow"><div class="io-card"><span>Goes in</span><strong>' + escapeHtml(stage.input) + '</strong></div>' +
@@ -1655,9 +1635,11 @@
         if (nextIndex !== index) selectStage(stages[nextIndex].id, true);
       }
 
-      function setTheme(theme) {
+      function setTheme(theme, persist) {
         document.documentElement.setAttribute("data-theme", theme);
-        try { localStorage.setItem("rag-explainer-theme", theme); } catch (error) {}
+        if (persist !== false) {
+          try { localStorage.setItem("rag-explainer-theme", theme); } catch (error) {}
+        }
         var button = document.getElementById("themeButton");
         var dark = theme === "dark";
         button.innerHTML = dark ? icons.sun : icons.moon;
@@ -1666,10 +1648,15 @@
       }
 
       function initializeTheme() {
+        var requested = null;
+        if (embedded && window.parent !== window) {
+          try { requested = window.parent.document.documentElement.dataset.theme; } catch (error) {}
+        }
         var saved = null;
         try { saved = localStorage.getItem("rag-explainer-theme"); } catch (error) {}
         var preferred = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-        setTheme(saved === "dark" || saved === "light" ? saved : preferred);
+        if (embedded && (requested === "dark" || requested === "light")) setTheme(requested, false);
+        else setTheme(saved === "dark" || saved === "light" ? saved : preferred);
       }
 
       document.getElementById("themeButton").addEventListener("click", function () {
@@ -1680,9 +1667,9 @@
           window.parent.postMessage({type: "ravndock:rag-explainer-back"}, "*");
         }
       });
-      document.getElementById("presentButton").addEventListener("click", function () {
-        if (!document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
-        else if (document.exitFullscreen) document.exitFullscreen();
+      window.addEventListener("message", function (event) {
+        if (!embedded || event.source !== window.parent || event.data?.type !== "ravndock:theme") return;
+        if (event.data.theme === "dark" || event.data.theme === "light") setTheme(event.data.theme, false);
       });
       document.getElementById("tourButton").addEventListener("click", function () {
         relationFocus = null;

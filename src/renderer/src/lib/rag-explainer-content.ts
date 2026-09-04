@@ -82,7 +82,7 @@ export const RAG_JOURNEY_RELATIONS: RagJourneyRelation[] = [
     toLabel: 'Embed query',
     connectorLabel: 'Same model and vector space',
     description:
-      'Journey 2 uses the same local embedding model so the question and stored passages can be compared by meaning.',
+      'Stage 2 uses the same local embedding model so the question and stored passages can be compared by meaning.',
     fromStageIds: ['document-embedding'],
     toStageIds: ['query-embedding']
   },
@@ -93,7 +93,7 @@ export const RAG_JOURNEY_RELATIONS: RagJourneyRelation[] = [
     toLabel: 'Retrieve',
     connectorLabel: 'Stored searchable index',
     description:
-      'Retrieve searches the chunks, vectors, keywords and source metadata prepared in Journey 1.',
+      'Retrieve searches the chunks, vectors, keywords and source metadata prepared in Stage 1.',
     fromStageIds: ['vector-database'],
     toStageIds: ['hybrid-search']
   },
@@ -299,6 +299,6 @@ export function getRagExplainerStage(id: RagStageId): RagExplainerStage {
 }
 
 export function ragStageJourneyLabel(stage: RagExplainerStage): string {
-  const journey = stage.phase === 'prepare' ? 'Journey 1' : 'Journey 2'
-  return `${journey} · Step ${stage.number} · ${stage.shortTitle}`
+  const stageLabel = stage.phase === 'prepare' ? 'Stage 1' : 'Stage 2'
+  return `${stageLabel} · Step ${stage.number} · ${stage.shortTitle}`
 }

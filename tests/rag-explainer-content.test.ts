@@ -12,7 +12,7 @@ import {
   type RagStageId
 } from '../src/renderer/src/lib/rag-explainer-content'
 
-test('covers the end-to-end ingestion and question journeys in order', () => {
+test('covers the end-to-end ingestion and question stages in order', () => {
   const prepare = stagesForPhase('prepare')
   const answer = stagesForPhase('answer')
 
@@ -54,14 +54,14 @@ test('gives every explorable stage an input, output and teaching takeaway', () =
   }
 })
 
-test('labels every selected process with its journey, step number and name', () => {
+test('labels every selected process with its stage, step number and name', () => {
   assert.equal(
     ragStageJourneyLabel(getRagExplainerStage('extract')),
-    'Journey 1 · Step 2 · Read files'
+    'Stage 1 · Step 2 · Read files'
   )
   assert.equal(
     ragStageJourneyLabel(getRagExplainerStage('output-tokens')),
-    'Journey 2 · Step 6 · Generate'
+    'Stage 2 · Step 6 · Generate'
   )
 })
 
@@ -102,7 +102,7 @@ test('distinguishes prepared evidence from app-created answer rules', () => {
   })
 })
 
-test('maps the true dependencies between the preparation and question journeys', () => {
+test('maps the true dependencies between the preparation and question stages', () => {
   assert.deepEqual(
     RAG_JOURNEY_RELATIONS.map((relation) => ({
       id: relation.id,
