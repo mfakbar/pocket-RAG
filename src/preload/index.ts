@@ -60,6 +60,7 @@ export interface AppAPI {
   listKnowledgeFiles: (knowledgeBaseId?: string) => Promise<KnowledgeFile[]>
   openCitation: (knowledgeBaseId: string | undefined, file: string) => Promise<boolean>
   revealCitation: (knowledgeBaseId: string | undefined, file: string) => Promise<boolean>
+  revealRagStageOutcome: (stageId: string) => Promise<boolean>
   rebuildKnowledgeBase: (knowledgeBaseId?: string) => Promise<SyncResult>
   onSyncProgress: (listener: (progress: SyncProgress) => void) => () => void
   startChat: (request: ChatRequest) => Promise<ChatStartResult>
@@ -120,6 +121,7 @@ const api: AppAPI = {
     ipcRenderer.invoke('citation:open', knowledgeBaseId, file),
   revealCitation: (knowledgeBaseId, file) =>
     ipcRenderer.invoke('citation:reveal', knowledgeBaseId, file),
+  revealRagStageOutcome: (stageId) => ipcRenderer.invoke('rag:reveal-stage-outcome', stageId),
   rebuildKnowledgeBase: (knowledgeBaseId) =>
     ipcRenderer.invoke('knowledge:rebuild', knowledgeBaseId),
   onSyncProgress: (listener) => {

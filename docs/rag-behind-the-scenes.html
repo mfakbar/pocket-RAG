@@ -542,6 +542,9 @@
     }
     .small-button:hover { border-color: var(--border-strong); background: var(--surface-3); }
     .small-button:disabled { cursor: not-allowed; opacity: .4; }
+    .outcome-link { width: 100%; margin-top: 10px; justify-content: center; color: var(--blue-strong); }
+    .outcome-note { margin: 7px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .outcome-note.error { color: var(--danger); }
     .inspector-body {
       display: grid;
       grid-template-columns: minmax(270px, .72fr) minmax(0, 1.55fr);
@@ -1307,6 +1310,14 @@
         }
       ];
 
+      var savedOutcomes = {
+        "local-folder": {button: "Open knowledge folder", note: "Original files stay in the selected knowledge folder."},
+        extract: {button: "Open derived index folder", note: "Structured document metadata is stored locally with the derived index."},
+        chunk: {button: "Open chunk and vector data", note: "Chunks, source locations, and embeddings are stored together in LanceDB."},
+        "document-embedding": {button: "Open vector data", note: "Each embedding is stored beside its source chunk in LanceDB."},
+        "vector-database": {button: "Open LanceDB folder", note: "This folder contains the local searchable index built from derived data."}
+      };
+
       var selectedId = "local-folder";
       var relationFocus = null;
       var streamTimer = null;
@@ -1408,6 +1419,10 @@
             stageRelations.map(function (relation) { return escapeHtml(relation.from + " → " + relation.to + ": " + relation.label); }).join("<br>") +
             '</div>';
         }
+        var savedOutcome = savedOutcomes[stage.id];
+        var outcomeHtml = savedOutcome
+          ? '<button class="small-button outcome-link" id="openOutcomeButton" type="button">' + escapeHtml(savedOutcome.button) + ' ↗</button><p class="outcome-note" id="outcomeNote">' + escapeHtml(savedOutcome.note) + '</p>'
+          : '<p class="outcome-note">This is a temporary, in-memory result. RavnDock does not save a folder for it.</p>';
         document.getElementById("stageCopy").innerHTML =
           '<div class="stage-heading"><span class="large-icon" aria-hidden="true">' + icons[stage.icon] + '</span><div>' +
           '<p class="step-kicker">' + (stage.phase === "prepare" ? "Stage 1" : "Stage 2") + ' · Step ' + stage.number + ' · ' + escapeHtml(stage.short) + '</p>' +
@@ -1415,7 +1430,7 @@
           '<p class="stage-detail">' + escapeHtml(stage.detail) + '</p>' +
           '<div class="io-flow"><div class="io-card"><span>Goes in</span><strong>' + escapeHtml(stage.input) + '</strong></div>' +
           '<div class="io-card"><span>Comes out</span><strong>' + escapeHtml(stage.output) + '</strong></div></div>' +
-          '<div class="key-idea"><strong>Why it matters</strong>' + escapeHtml(stage.idea) + '</div>' + relationHtml;
+          '<div class="key-idea"><strong>Why it matters</strong>' + escapeHtml(stage.idea) + '</div>' + outcomeHtml + relationHtml;
 
         document.getElementById("stageExample").innerHTML =
           '<div class="example-header"><span class="example-title">Illustrative data</span><span class="illustrative">Representative</span></div>' +
@@ -1426,6 +1441,13 @@
         document.getElementById("previousButton").disabled = index === 0;
         document.getElementById("nextButton").disabled = index === stages.length - 1;
         bindExampleInteractions(stage.id);
+        if (savedOutcome) document.getElementById("openOutcomeButton").addEventListener("click", function () {
+          var button = document.getElementById("openOutcomeButton");
+          button.disabled = true;
+          document.getElementById("outcomeNote").textContent = "Opening folder…";
+          if (embedded && window.parent !== window) window.parent.postMessage({type: "ravndock:rag-explainer-reveal-outcome", stageId: stage.id}, "*");
+          else { button.disabled = false; document.getElementById("outcomeNote").textContent = "Open this page inside RavnDock to access the local folder."; }
+        });
       }
 
       function exampleFor(id) {
@@ -1668,8 +1690,23 @@
         }
       });
       window.addEventListener("message", function (event) {
-        if (!embedded || event.source !== window.parent || event.data?.type !== "ravndock:theme") return;
-        if (event.data.theme === "dark" || event.data.theme === "light") setTheme(event.data.theme, false);
+        if (!embedded || event.source !== window.parent) return;
+        if (event.data?.type === "ravndock:theme") {
+          if (event.data.theme === "dark" || event.data.theme === "light") setTheme(event.data.theme, false);
+          return;
+        }
+        if (event.data?.type === "ravndock:rag-explainer-outcome-opened" && event.data.stageId === selectedId) {
+          var openedButton = document.getElementById("openOutcomeButton");
+          if (openedButton) openedButton.disabled = false;
+          var openedNote = document.getElementById("outcomeNote");
+          if (openedNote) { openedNote.classList.remove("error"); openedNote.textContent = "Folder opened in Finder."; }
+        }
+        if (event.data?.type === "ravndock:rag-explainer-outcome-error" && event.data.stageId === selectedId) {
+          var failedButton = document.getElementById("openOutcomeButton");
+          if (failedButton) failedButton.disabled = false;
+          var failedNote = document.getElementById("outcomeNote");
+          if (failedNote) { failedNote.classList.add("error"); failedNote.textContent = event.data.message || "Could not open this result folder."; }
+        }
       });
       document.getElementById("tourButton").addEventListener("click", function () {
         relationFocus = null;

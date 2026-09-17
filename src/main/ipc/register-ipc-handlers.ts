@@ -79,7 +79,8 @@ export function registerIpcHandlers(
   rag: LocalRagService,
   ingestionRag: LocalRagService,
   ollama: OllamaService,
-  resources: ResourceMonitorService
+  resources: ResourceMonitorService,
+  ragIndexDirectory: () => string
 ): void {
   const activeChats = new Map<string, AbortController>()
   const activeDownloads = new Map<string, AbortController>()
@@ -555,6 +556,31 @@ export function registerIpcHandlers(
   handleTrusted('knowledge:list-files', async (_event, knowledgeBaseId?: string) =>
     knowledgeFiles(await readConfig(), knowledgeBaseId)
   )
+  handleTrusted('rag:reveal-stage-outcome', async (_event, stageId: unknown) => {
+    if (typeof stageId !== 'string') throw new Error('Unknown RAG process.')
+
+    const config = await readConfig()
+    const activeBase = config.knowledgeBases.find(
+      (base) => base.id === config.activeKnowledgeBaseId
+    )
+    const indexRoot = ragIndexDirectory()
+    const locations: Record<string, string | undefined> = {
+      'local-folder': activeBase?.folder,
+      extract: indexRoot,
+      chunk: path.join(indexRoot, 'lancedb'),
+      'document-embedding': path.join(indexRoot, 'lancedb'),
+      'vector-database': path.join(indexRoot, 'lancedb')
+    }
+    const location = locations[stageId]
+    if (!location) throw new Error('This process has no saved folder to open.')
+    const exists = await stat(location)
+      .then(() => true)
+      .catch(() => false)
+    if (!exists) throw new Error('This result is not available yet. Sync a knowledge base first.')
+    const problem = await shell.openPath(location)
+    if (problem) throw new Error('macOS could not open this result folder.')
+    return true
+  })
   const resolveCitationPath = async (knowledgeBaseId: unknown, file: unknown): Promise<string> => {
     if (typeof file !== 'string' || !file.trim()) throw new Error('This source is unavailable.')
     const config = await readConfig()

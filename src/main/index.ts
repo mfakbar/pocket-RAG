@@ -108,7 +108,9 @@ function createWindow(): void {
   mainWindow.once('ready-to-show', () => mainWindow?.show())
 }
 
-registerIpcHandlers(runtime, knowledge, queryRag, ingestionRag, ollama, resources)
+registerIpcHandlers(runtime, knowledge, queryRag, ingestionRag, ollama, resources, () =>
+  path.join(app.getPath('userData'), 'rag-index')
+)
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()

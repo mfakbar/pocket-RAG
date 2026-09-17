@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AppSettings } from '../../../shared/contracts'
 
 const BACK_MESSAGE = 'ravndock:rag-explainer-back'
+const REVEAL_OUTCOME_MESSAGE = 'ravndock:rag-explainer-reveal-outcome'
 
 export default function RagExplainerView({
   settings,
@@ -45,6 +46,27 @@ export default function RagExplainerView({
     const handleMessage = (event: MessageEvent): void => {
       if (event.source !== frameRef.current?.contentWindow) return
       if (event.data?.type === BACK_MESSAGE) onBack()
+      if (event.data?.type === REVEAL_OUTCOME_MESSAGE && typeof event.data.stageId === 'string') {
+        void window.api
+          .revealRagStageOutcome(event.data.stageId)
+          .then(() =>
+            frameRef.current?.contentWindow?.postMessage(
+              { type: 'ravndock:rag-explainer-outcome-opened', stageId: event.data.stageId },
+              '*'
+            )
+          )
+          .catch((error: unknown) =>
+            frameRef.current?.contentWindow?.postMessage(
+              {
+                type: 'ravndock:rag-explainer-outcome-error',
+                stageId: event.data.stageId,
+                message:
+                  error instanceof Error ? error.message : 'Could not open this result folder.'
+              },
+              '*'
+            )
+          )
+      }
     }
 
     window.addEventListener('message', handleMessage)

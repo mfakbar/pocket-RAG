@@ -463,13 +463,12 @@ export default function App(): React.JSX.Element {
           <p>
             RavnDock was originally created as a showcase and conversation starter for my clients.
             It turns out there is a common need shared by family and friends: a private, local
-            document chatbot that is simple and completely free to use. You do not need to be
-            tech-savvy. Just select a folder and start chatting.
+            document chatbot that is simple and free to use. Just select a folder and start
+            chatting.
           </p>
           <p>
-            Not every use case needs a frontier model. RavnDock is designed for everyday Macs,
-            including my 2021 MacBook Pro M1, so you can chat with your own files without needing a
-            high-end GPU.
+            Not every use case needs a frontier model. RavnDock default models are intended for
+            everyday Macs, including my MacBook Pro M1 16GB.
           </p>
           <p>I hope RavnDock is useful to you. Any feedback is always welcome.</p>
           <div className="border-t border-border pt-3 text-xs">

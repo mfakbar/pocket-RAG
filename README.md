@@ -36,7 +36,10 @@ indexing through retrieval, output-token generation, and citation checks.
 <a href="https://mfakbar.github.io/pocket-RAG/rag-behind-the-scenes.html" target="_blank" rel="noopener noreferrer"><img src="docs/images/rag-output-tokens.png" alt="RavnDock behind-the-scenes screen showing the Generate output tokens step" width="960"></a>
 
 The preview uses illustrative content; it does not expose customer documents or live
-application data.
+application data. In the desktop walkthrough, Stage 1 also provides Finder links to the
+selected source folder and the locally stored derived index (including LanceDB chunks and
+vectors). Stage 2 outputs are temporary in-memory data, so the app labels them instead of
+offering misleading folder links.
 
 ## Resource monitoring
 
